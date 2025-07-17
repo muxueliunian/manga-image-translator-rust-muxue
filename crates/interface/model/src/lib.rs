@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use base_util::error::ModelLoadError;
+pub use base_util::error::ModelLoadError;
 #[cfg(feature = "onnx")]
 use base_util::onnx::{all_providers, Providers};
 

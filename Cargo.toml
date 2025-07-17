@@ -22,7 +22,7 @@ anyhow = "1.0.98"
 util = { path = "crates/util" }
 opencv = { version = "0.95", default-features = false }
 fast_image_resize = "5.2"
-tokio = "1.45.1"
+tokio = "1.46.1"
 env_logger = "0.11.8"
 ort = { version = "2.0.0-rc.10" }
 ndarray = "0.16.1"
