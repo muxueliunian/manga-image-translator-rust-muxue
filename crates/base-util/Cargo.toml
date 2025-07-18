@@ -12,6 +12,6 @@ opencv = { workspace = true, optional = true }
 ureq.workspace = true
 
 [features]
-default = ["onnx", "opencv"]
+default = []
 onnx = ["dep:ort"]
 opencv = ["dep:opencv"]
