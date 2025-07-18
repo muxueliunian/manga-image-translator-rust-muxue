@@ -38,17 +38,13 @@ impl ModelDb {
             if failure(&file_path, hash) {
                 let _ = std::fs::remove_file(&file_path);
                 download_and_extract(url, &file_path, folder)?;
-            }
-            if failure(&file_path, hash) {
-                panic!()
-            }
-        } else {
-            if failure(&file_path, hash) {
-                let _ = std::fs::remove_file(&file_path);
-                download_and_extract(url, &file_path, folder)?;
-            }
-            if failure(&file_path, hash) {
-                panic!()
+                if failure(&file_path, hash) {
+                    let _ = std::fs::remove_file(&file_path);
+                    download_and_extract(url, &file_path, folder)?;
+                    if failure(&file_path, hash) {
+                        panic!()
+                    }
+                }
             }
         }
         Ok(ret_file_path)
