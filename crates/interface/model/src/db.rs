@@ -1,6 +1,6 @@
 use std::{
-    fs::{self, read_dir, File},
-    io::{BufReader, Read, Seek as _},
+    fs::{self, read_dir, read_to_string, File, OpenOptions},
+    io::{BufReader, Read, Seek as _, Write as _},
     path::{Component, Path, PathBuf},
 };
 
@@ -22,7 +22,9 @@ impl ModelDb {
         url: &str,
         hash: &str,
     ) -> Result<PathBuf, ModelLoadError> {
-        let mut file_path = root_path().join("models").join(kind).join(name).join(file);
+        let base_path = root_path().join("models").join(kind).join(name);
+        let hash_path = base_path.join("hashes");
+        let mut file_path = base_path.join(file);
 
         std::fs::create_dir_all(file_path.parent().expect("set above"))
             .map_err(ModelLoadError::from)?;
@@ -33,15 +35,15 @@ impl ModelDb {
 
             folder = true;
         }
-        if failure(&file_path, hash) {
+        if failure(Some(&hash_path), &file_path, hash) {
             download_and_extract(url, &file_path, folder)?;
-            if failure(&file_path, hash) {
+            if failure(Some(&hash_path), &file_path, hash) {
                 let _ = std::fs::remove_file(&file_path);
                 download_and_extract(url, &file_path, folder)?;
-                if failure(&file_path, hash) {
+                if failure(Some(&hash_path), &file_path, hash) {
                     let _ = std::fs::remove_file(&file_path);
                     download_and_extract(url, &file_path, folder)?;
-                    if failure(&file_path, hash) {
+                    if failure(Some(&hash_path), &file_path, hash) {
                         panic!()
                     }
                 }
@@ -68,7 +70,7 @@ fn get_all_files_recursively<P: AsRef<Path>>(dir: P) -> Vec<std::path::PathBuf> 
     files
 }
 
-fn failure<P: AsRef<Path>>(file_path: P, expected_hash: &str) -> bool {
+fn failure<P: AsRef<Path>>(info_path: Option<P>, file_path: P, expected_hash: &str) -> bool {
     if !file_path.as_ref().exists() {
         return true;
     }
@@ -85,6 +87,36 @@ fn failure<P: AsRef<Path>>(file_path: P, expected_hash: &str) -> bool {
     if expected_hash == "###" {
         return false;
     }
+
+    if let Some(info_path) = &info_path {
+        let p = file_path.as_ref();
+        let content = read_to_string(&info_path).unwrap_or_default();
+        let hash_cache = content
+            .lines()
+            .filter_map(|v| v.trim().rsplit_once(" "))
+            .find(|v| Path::new(v.0) == p)
+            .map(|v| v.1);
+        if let Some(hash) = hash_cache {
+            if hash != expected_hash {
+                let content = content
+                    .lines()
+                    .filter_map(|v| v.trim().rsplit_once(" "))
+                    .filter(|v| Path::new(v.0) != p)
+                    .map(|v| format!("{} {}", v.0, v.1))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                let mut file = OpenOptions::new()
+                    .write(true)
+                    .truncate(true)
+                    .open(&info_path)
+                    .unwrap();
+
+                file.write_all(content.as_bytes()).unwrap();
+            }
+            return hash != expected_hash;
+        }
+    }
+
     match file_path.as_ref().is_dir() {
         true => {
             let mut entries = Vec::new();
@@ -124,6 +156,23 @@ fn failure<P: AsRef<Path>>(file_path: P, expected_hash: &str) -> bool {
             let result = hasher.finalize();
             let dir_hash = format!("{:x}", result);
             debug!("Dir hash: {}", dir_hash);
+            if let Some(info_path) = info_path {
+                if &dir_hash == expected_hash {
+                    let mut file = OpenOptions::new()
+                        .append(true)
+                        .create(true)
+                        .open(&info_path)
+                        .unwrap();
+
+                    writeln!(
+                        file,
+                        "{} {}",
+                        file_path.as_ref().to_string_lossy(),
+                        expected_hash
+                    )
+                    .unwrap();
+                }
+            }
             dir_hash != expected_hash.to_owned()
         }
         false => {
@@ -142,7 +191,25 @@ fn failure<P: AsRef<Path>>(file_path: P, expected_hash: &str) -> bool {
             let result = hasher.finalize();
             let file_hash = format!("{:x}", result);
             debug!("File hash: {}", file_hash);
-            file_hash != expected_hash.to_owned()
+            if let Some(info_path) = info_path {
+                if &file_hash == expected_hash {
+                    let mut file = OpenOptions::new()
+                        .append(true)
+                        .create(true)
+                        .open(&info_path)
+                        .unwrap();
+
+                    writeln!(
+                        file,
+                        "{} {}",
+                        file_path.as_ref().to_string_lossy(),
+                        expected_hash
+                    )
+                    .unwrap();
+                }
+            }
+
+            &file_hash != expected_hash
         }
     }
 }
@@ -288,7 +355,11 @@ mod tests {
             .filter_level(log::LevelFilter::Debug)
             .try_init();
         assert_eq!(
-            failure(root_path().join("models/detector/paddle/det.onnx"), ""),
+            failure(
+                None,
+                root_path().join("models/detector/paddle/det.onnx"),
+                ""
+            ),
             true
         );
     }
@@ -296,7 +367,7 @@ mod tests {
     #[test]
     fn test_failure_returns_true_for_nonexistent_file() {
         let path = PathBuf::from("nonexistent.file");
-        assert!(failure(path, "abc"));
+        assert!(failure(None, path, "abc"));
     }
 
     #[test]
@@ -306,7 +377,7 @@ mod tests {
         fs::write(&path, "correct content").expect("couldnt write temp file");
 
         let correct_hash = format!("{:x}", Sha256::digest(b"correct content"));
-        assert!(!failure(&path, &correct_hash));
+        assert!(!failure(None, &path, &correct_hash));
     }
 
     #[test]
@@ -329,7 +400,11 @@ mod tests {
             .filter_level(log::LevelFilter::Debug)
             .try_init();
         assert_eq!(
-            failure(root_path().join("models/invalid/invalid/spm.nopretok"), ""),
+            failure(
+                None,
+                root_path().join("models/invalid/invalid/spm.nopretok"),
+                ""
+            ),
             true
         );
     }
