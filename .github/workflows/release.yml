@@ -106,11 +106,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            release/manga-image-translator-macos-x86_64
-            release/manga-image-translator-linux-x86_64
-            release/manga-image-translator-windows-x86_64.exe
-            release/manga-image-translator-linux-arm64
-            release/manga-image-translator-macos-arm64
+            release/manga-image-translator-*
+            wheels-*.whl
           draft: false
           prerelease: false
         env:
