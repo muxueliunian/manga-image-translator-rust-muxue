@@ -1,4 +1,5 @@
 pub mod error;
+#[cfg(feature = "onnx")]
 pub mod onnx;
 pub mod project;
 

@@ -15,17 +15,15 @@
 - [x] detectors
   - [x] dbnet
   - [x] none
-  - [ ] ctd
+  - [x] ctd
   - [x] [paddle](https://github.com/mg-chao/paddle-ocr-rs)
   - [x] dbnet_convnext
-  - [ ] python-module
   - [ ] ~~craft~~
 - [ ] ocr
   - [ ] 32px
   - [ ] 48px
   - [ ] 48px_ctc
   - [ ] mocr
-  - [ ] python-module
 - [ ] inpainter
   - [ ] default
   - [ ] lama_large
@@ -33,15 +31,12 @@
   - [ ] sd
   - [ ] none
   - [ ] original
-  - [ ] python-module
 - [ ] colorizer
   - [ ] none
-  - [ ] python-module
   - [ ] mc2
 - [ ] renderer
   - [ ] json/struct
   - [ ] gimp
-  - [ ] python-module
   - [ ] svg
   - [ ] png
 - [ ] upscaler python integration
@@ -53,7 +48,6 @@
 - [ ] cleanup code
 - [ ] more tests(100% test coverage)
 - [ ] more benchmarks
-- [ ] cleanup code
 - [ ] optimize code
 - [~] error handling
 - [ ] replace clipper2
@@ -73,4 +67,4 @@
     - [x] linux arm64
     - [x] windows x86_64
     - [ ] windows arm64(no prebuild clang)
-    - [ ] ~~windows x64~~
+    - [ ] ~~windows x86~~

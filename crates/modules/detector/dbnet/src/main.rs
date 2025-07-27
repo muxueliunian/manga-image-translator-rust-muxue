@@ -1,10 +1,12 @@
 use base_util::RawSerializable;
 use dbnet::DbNetDetector;
-use interface::{
-    detectors::{DefaultOptions, Detector, PreprocessorOptions},
-    image::{CpuImageProcessor, ImageOp, RawImage},
-    model::{CreateData, Model as _},
-};
+use interface_detector::DefaultOptions;
+use interface_detector::Detector;
+use interface_detector::PreprocessorOptions;
+use interface_image::{CpuImageProcessor, ImageOp, RawImage};
+use interface_model::CreateData;
+use interface_model::Model;
+
 fn main() {
     env_logger::init();
     let mut data = DbNetDetector::new(CreateData::all(), false);

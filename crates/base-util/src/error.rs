@@ -16,6 +16,7 @@ pub enum ModelLoadError {
     CouldntCreateFile(#[from] std::io::Error),
     #[error("Failed to download model")]
     DownloadFailed(#[from] ureq::Error),
+    #[cfg(feature = "onnx")]
     #[error("Failed to create session")]
     CreateSession(#[from] ort::Error),
     #[error("Model not registered")]
@@ -24,6 +25,7 @@ pub enum ModelLoadError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ProcessingError {
+    #[cfg(feature = "onnx")]
     #[error("caused by ort")]
     Model(#[from] ort::Error),
     #[error("caused by ort but shape mismatch")]
@@ -32,6 +34,7 @@ pub enum ProcessingError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum PreProcessingError {
+    #[cfg(feature = "opencv")]
     #[error("caused by opencv")]
     OpenCv(#[from] opencv::Error),
     #[error("caused by ndarray")]
@@ -42,6 +45,7 @@ pub enum PreProcessingError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum PostProcessingError {
+    #[cfg(feature = "opencv")]
     #[error("caused by opencv")]
     OpenCv(#[from] opencv::Error),
     #[error("expected output, but got none")]

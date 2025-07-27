@@ -1,6 +1,6 @@
 use base_util::error::ProcessingError;
 use criterion::{criterion_group, criterion_main, Criterion};
-use interface::image::{dummy::DummyImageProcessor, CpuImageProcessor, ImageOp, RawImage};
+use interface_image::{CpuImageProcessor, ImageOp, RawImage};
 use ndarray::Array4;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;

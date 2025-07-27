@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use interface::image::{DimType, ImageOp, Interpolation, RawImage};
+use interface_image::{DimType, ImageOp, Interpolation, RawImage};
 use ndarray::ArrayView2;
 use opencv::{
     core::{Mat, MatTraitConst as _, Point, Vector, CV_8UC1},
@@ -90,7 +90,7 @@ pub fn find_contours_from_ndarray(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use interface::image::{CpuImageProcessor, Interpolation, RawImage};
+    use interface_image::CpuImageProcessor;
     use ndarray::array;
 
     #[test]

@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-interface.workspace = true
+interface-model.workspace = true
+interface-detector.workspace = true
 anyhow.workspace = true
 base-util.workspace = true
+interface-image.workspace = true

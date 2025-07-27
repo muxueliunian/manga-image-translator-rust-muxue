@@ -1,0 +1,53 @@
+[package]
+name = "interface-image"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ndarray.workspace = true
+opencv = { workspace = true, features = ["imgproc"] }
+image.workspace = true
+anyhow.workspace = true
+fast_image_resize.workspace = true
+rayon.workspace = true
+base-util = { workspace = true, default-features = false }
+
+[dev-dependencies]
+criterion.workspace = true
+
+[features]
+default = ["u16-dims"]
+gpu = []
+debug = []
+u16-dims = []
+
+[[bench]]
+name = "border_bench"
+harness = false
+[[bench]]
+name = "border_center_bench"
+harness = false
+[[bench]]
+name = "gamma_correction_bench"
+harness = false
+[[bench]]
+name = "histogram_equalization_bench"
+harness = false
+[[bench]]
+name = "invert_bench"
+harness = false
+[[bench]]
+name = "remove_border_mask_bench"
+harness = false
+[[bench]]
+name = "resize_bench"
+harness = false
+[[bench]]
+name = "resize_mask_bench"
+harness = false
+[[bench]]
+name = "rotate_bench"
+harness = false
+[[bench]]
+name = "rotate_left_mask_bench"
+harness = false

@@ -3,12 +3,11 @@ use std::sync::Arc;
 use base_util::onnx::{all_providers, Providers};
 use base_util::RawSerializable;
 use dbnet::DbNetDetector;
-use interface::detectors::DefaultOptions;
-use interface::{
-    detectors::{textlines::Quadrilateral, Detector, PreprocessorOptions},
-    image::{CpuImageProcessor, ImageOp, RawImage},
-    model::CreateData,
-};
+
+use interface_detector::textlines::Quadrilateral;
+use interface_detector::{DefaultOptions, Detector, PreprocessorOptions};
+use interface_image::{CpuImageProcessor, ImageOp, RawImage};
+use interface_model::CreateData;
 use numpy::{
     ndarray::{Array2, Array3},
     IntoPyArray as _, PyArray2, PyArray3, PyArrayMethods, PyReadonlyArray3,

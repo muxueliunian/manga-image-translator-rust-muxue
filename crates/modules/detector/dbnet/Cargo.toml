@@ -8,7 +8,9 @@ opencv = { workspace = true, default-features = false, features = [
     "imgproc",
     "clang-runtime",
 ] }
-interface.workspace = true
+interface-model.workspace = true
+interface-detector.workspace = true
+interface-image.workspace = true
 log.workspace = true
 anyhow.workspace = true
 maplit.workspace = true

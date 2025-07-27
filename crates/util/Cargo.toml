@@ -9,8 +9,11 @@ opencv = { workspace = true, default-features = false, features = [
     "imgproc",
     "clang-runtime",
 ] }
+petgraph.workspace = true
+itertools.workspace = true
+interface-image.workspace = true
+interface-detector.workspace = true
 anyhow.workspace = true
-interface.workspace = true
 fast_image_resize.workspace = true
 clipper2c-sys = "0.1.5"
 log.workspace = true
@@ -24,7 +27,7 @@ ort = { workspace = true, features = [
 ] }
 ndarray-linalg = { workspace = true, features = ["intel-mkl-static"] }
 rayon = "1.10.0"
-base-util.workspace = true
+base-util = { workspace = true, features = ["onnx", "opencv"] }
 
 [dev-dependencies]
 criterion = "0.6.0"

@@ -69,28 +69,29 @@ impl SegDetectorRepresenter {
     ///     thresh_binary: [if exists] binarized with threshold, (N, H, W)
     pub fn call(
         &self,
-        batch: Batch,
         pred: Array4<f32>,
         is_output_polygon: bool,
+        width: u16,
+        height: u16,
     ) -> Result<(Vec<Option<Array3<i64>>>, Vec<Option<Vec<f64>>>), PostProcessingError> {
         let pred: Array3<f32> = pred.slice(s![.., 0, .., ..]).to_owned();
         let segmentation: Array3<bool> = self.binarize(&pred);
         let batch_size = pred.shape()[0];
         let (mut boxes_batch, mut scores_batch): (Vec<Option<Array3<i64>>>, Vec<Option<Vec<f64>>>) =
             (vec![], vec![]);
-        for (batch_index, (height, width)) in batch.shape[0..batch_size].iter().enumerate() {
+        for batch_index in 0..batch_size {
             let (b, s) = match is_output_polygon {
                 true => self.polygons_from_bitmap(
                     pred.index_axis(Axis(0), batch_index),
                     segmentation.index_axis(Axis(0), batch_index),
-                    *width,
-                    *height,
+                    width,
+                    height,
                 ),
                 false => self.boxes_from_bitmap(
                     pred.index_axis(Axis(0), batch_index),
                     segmentation.index_axis(Axis(0), batch_index),
-                    *width,
-                    *height,
+                    width,
+                    height,
                 )?,
             };
             boxes_batch.push(b);

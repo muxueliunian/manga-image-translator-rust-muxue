@@ -1,17 +1,16 @@
 use std::{collections::HashMap, vec};
 
 use base_util::error::ModelLoadError;
-use interface::{
-    detectors::{Detector, Mask},
-    model::Model,
-};
+use interface_detector::{textlines::Quadrilateral, Detector};
+use interface_image::{ImageOp, Mask, RawImage};
+use interface_model::{CreateData, Model, ModelSource};
 
 pub struct NoneDetector {
     loaded: bool,
 }
 
 impl NoneDetector {
-    pub fn new(_: interface::model::CreateData) -> Box<Self> {
+    pub fn new(_: CreateData) -> Box<Self> {
         Box::new(NoneDetector { loaded: true })
     }
 }
@@ -25,7 +24,7 @@ impl Model for NoneDetector {
         "detector"
     }
 
-    fn models(&self) -> std::collections::HashMap<&'static str, interface::model::ModelSource> {
+    fn models(&self) -> std::collections::HashMap<&'static str, ModelSource> {
         HashMap::new()
     }
 
@@ -46,13 +45,10 @@ impl Model for NoneDetector {
 impl Detector for NoneDetector {
     fn infer(
         &mut self,
-        img: interface::image::RawImage,
+        img: RawImage,
         _: &[u8],
-        _: &Box<dyn interface::image::ImageOp + Send + Sync>,
-    ) -> anyhow::Result<(
-        Vec<interface::detectors::textlines::Quadrilateral>,
-        interface::detectors::Mask,
-    )> {
+        _: &Box<dyn ImageOp + Send + Sync>,
+    ) -> anyhow::Result<(Vec<Quadrilateral>, Mask)> {
         Ok((
             vec![],
             Mask {
@@ -66,11 +62,10 @@ impl Detector for NoneDetector {
 
 #[cfg(test)]
 mod tests {
-    use interface::{
-        detectors::{Detector, PreprocessorOptions},
-        image::{CpuImageProcessor, ImageOp, RawImage},
-        model::{CreateData, Model as _},
-    };
+
+    use interface_detector::{Detector as _, PreprocessorOptions};
+    use interface_image::{CpuImageProcessor, ImageOp, RawImage};
+    use interface_model::{CreateData, Model as _};
 
     use crate::NoneDetector;
 

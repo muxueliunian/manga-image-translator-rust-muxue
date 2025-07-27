@@ -4,3 +4,15 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+interface-model.workspace = true
+interface-detector.workspace = true
+interface-image.workspace = true
+ndarray.workspace = true
+ort.workspace = true
+base-util.workspace = true
+anyhow.workspace = true
+util.workspace = true
+maplit.workspace = true
+roots.workspace = true
+imageproc.workspace = true
+opencv = { workspace = true, features = ["imgproc"] }

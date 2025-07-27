@@ -1,0 +1,9 @@
+[package]
+name = "interface-renderer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+interface-ocr.workspace = true
+anyhow.workspace = true
+interface-image.workspace = true

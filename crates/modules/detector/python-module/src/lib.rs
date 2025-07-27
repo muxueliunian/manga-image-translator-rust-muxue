@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use base_util::error::ModelLoadError;
-use interface::{detectors::Detector, model::Model};
+use interface_detector::{textlines::Quadrilateral, Detector};
+use interface_image::{ImageOp, Mask, RawImage};
+use interface_model::{Model, ModelSource};
 
 pub struct PythonDetector {}
 
@@ -14,7 +16,7 @@ impl Model for PythonDetector {
         "detector"
     }
 
-    fn models(&self) -> std::collections::HashMap<&'static str, interface::model::ModelSource> {
+    fn models(&self) -> std::collections::HashMap<&'static str, ModelSource> {
         HashMap::new()
     }
 
@@ -34,13 +36,10 @@ impl Model for PythonDetector {
 impl Detector for PythonDetector {
     fn infer(
         &mut self,
-        img: interface::image::RawImage,
+        img: RawImage,
         options: &[u8],
-        img_processor: &Box<dyn interface::image::ImageOp + Send + Sync>,
-    ) -> anyhow::Result<(
-        Vec<interface::detectors::textlines::Quadrilateral>,
-        interface::detectors::Mask,
-    )> {
+        img_processor: &Box<dyn ImageOp + Send + Sync>,
+    ) -> anyhow::Result<(Vec<Quadrilateral>, Mask)> {
         todo!()
     }
 }

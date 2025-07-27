@@ -1,0 +1,7 @@
+[package]
+name = "interface-upscaler"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+interface-image.workspace = true

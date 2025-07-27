@@ -1,0 +1,21 @@
+[package]
+name = "interface-model"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+flate2.workspace = true
+indicatif.workspace = true
+tar.workspace = true
+sha2.workspace = true
+log.workspace = true
+base-util.workspace = true
+tempfile.workspace = true
+ureq.workspace = true
+
+[dev-dependencies]
+env_logger.workspace = true
+
+[features]
+default = ["onnx"]
+onnx = ["base-util/onnx"]

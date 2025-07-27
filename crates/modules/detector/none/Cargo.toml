@@ -5,9 +5,11 @@ edition.workspace = true
 
 [dependencies]
 log.workspace = true
-interface.workspace = true
+interface-model.workspace = true
+interface-detector.workspace = true
 anyhow.workspace = true
 base-util.workspace = true
+interface-image.workspace = true
 
 [dev-dependencies]
 criterion = "0.6.0"

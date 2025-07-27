@@ -8,10 +8,9 @@ use base_util::{
 };
 use geo::{MinimumRotatedRect, Point};
 
-use interface::{
-    detectors::{textlines::Quadrilateral, DefaultOptions, Detector, Mask},
-    model::{CreateData, Model, ModelSource},
-};
+use interface_detector::{textlines::Quadrilateral, DefaultOptions, Detector};
+use interface_image::{ImageOp, Mask, RawImage};
+use interface_model::{CreateData, Model, ModelSource};
 use maplit::hashmap;
 use ort::session::builder::SessionBuilder;
 use paddle_ocr_rs::{base_net::BaseNet, db_net::DbNet, scale_param::ScaleParam};
@@ -41,7 +40,7 @@ impl Model for PaddleDetector {
         "detector"
     }
 
-    fn models(&self) -> std::collections::HashMap<&'static str, interface::model::ModelSource> {
+    fn models(&self) -> std::collections::HashMap<&'static str, ModelSource> {
         hashmap! {
             "det" => ModelSource { url: "https://github.com/frederik-uni/manga-image-translator-rust/releases/download/paddle-ocr-chinese-v4/det.onnx", hash: "b21a993484b367c0ea29d4a703c038d6ee3212173e6abf962b09188b032a9483" },
         }
@@ -123,13 +122,10 @@ impl Default for PaddleOptions {
 impl Detector for PaddleDetector {
     fn infer(
         &mut self,
-        img: interface::image::RawImage,
+        img: RawImage,
         options: &[u8],
-        _: &Box<dyn interface::image::ImageOp + Send + Sync>,
-    ) -> anyhow::Result<(
-        Vec<interface::detectors::textlines::Quadrilateral>,
-        interface::detectors::Mask,
-    )> {
+        _: &Box<dyn ImageOp + Send + Sync>,
+    ) -> anyhow::Result<(Vec<Quadrilateral>, Mask)> {
         let options = DefaultOptions::parse(options)?;
         let db_net = match &mut self.db_net {
             None => {
@@ -267,11 +263,9 @@ fn fill_polygon(mask: &mut [u8], width: usize, height: usize, poly: &[(i64, i64)
 mod tests {
     use crate::{PaddleDetector, PaddleOptions};
     use base_util::RawSerializable as _;
-    use interface::{
-        detectors::{DefaultOptions, Detector, PreprocessorOptions},
-        image::{CpuImageProcessor, ImageOp, RawImage},
-        model::{CreateData, Model as _},
-    };
+    use interface_detector::{DefaultOptions, Detector as _, PreprocessorOptions};
+    use interface_image::{CpuImageProcessor, ImageOp, RawImage};
+    use interface_model::{CreateData, Model as _};
 
     #[test]
     fn load_unload() {

@@ -4,7 +4,9 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-interface.workspace = true
+interface-model.workspace = true
+interface-detector.workspace = true
+interface-image.workspace = true
 pyo3 = { version = "0.25.1", features = ["extension-module", "abi3-py39"] }
 numpy = "0.25.0"
 dbnet.workspace = true

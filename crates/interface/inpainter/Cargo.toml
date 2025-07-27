@@ -1,0 +1,9 @@
+[package]
+name = "interface-inpainter"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+interface-image.workspace = true
+anyhow.workspace = true
+interface-model.workspace = true

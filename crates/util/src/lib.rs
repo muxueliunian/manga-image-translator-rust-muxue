@@ -2,6 +2,7 @@ pub mod dbnet;
 pub mod det_arrange;
 pub mod imageproc;
 pub mod opencv;
+mod text_direction;
 
 // infer | macos | python
 // Run 1: 3.3190 seconds

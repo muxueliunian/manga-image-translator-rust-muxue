@@ -1,5 +1,5 @@
 use base_util::error::{Error, PostProcessingError, PreProcessingError, ProcessingError};
-use interface::image::{DimType, ImageOp, RawImage};
+use interface_image::{DimType, ImageOp, Interpolation, RawImage};
 use log::info;
 use ndarray::{s, stack, Array, Array3, Array4, ArrayView3, Axis, Zip};
 use rayon::prelude::*;
@@ -36,7 +36,7 @@ fn square_pad_resize(
             img,
             tgt_size as u16,
             tgt_size as u16,
-            interface::image::Interpolation::Bilinear,
+            Interpolation::Bilinear,
         );
     }
 
@@ -418,7 +418,7 @@ fn unrearrange(
 #[cfg(test)]
 mod tests {
     use base_util::error::ProcessingError;
-    use interface::image::{CpuImageProcessor, ImageOp, RawImage};
+    use interface_image::{CpuImageProcessor, ImageOp, RawImage};
     use ndarray::Array4;
 
     use crate::det_arrange::det_rearrange_forward;

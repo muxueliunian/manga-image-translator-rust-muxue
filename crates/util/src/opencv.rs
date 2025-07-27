@@ -1,5 +1,5 @@
 use base_util::error::PreProcessingError;
-use interface::image::RawImage;
+use interface_image::RawImage;
 use opencv::core::{Mat, ToInputArray};
 
 //TODO: refactor + test + bench
