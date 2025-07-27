@@ -30,6 +30,8 @@ runs:
         import hashlib
         import base64
         import fnmatch
+        import os
+        import subprocess
 
 
         def find_dlls() -> list[Path]:
@@ -43,6 +45,15 @@ runs:
                 pattern = "libonnxruntime_providers_*.so"
 
             return list(base_dir.glob(pattern))
+        def get_opencv_dylib_paths():
+            try:
+                prefix = subprocess.check_output(["brew", "--prefix", "opencv"], text=True).strip()
+                lib_dir = os.path.join(prefix, "lib")
+                pattern = os.path.join(lib_dir, "libopencv_*.dylib")
+                return glob.glob(pattern)
+            except subprocess.CalledProcessError as e:
+                print("Error: Could not find OpenCV via Homebrew.")
+                return []
         def find_windows_dll() -> Path:
             # === Locate DLL ===
             dll_dir = Path("C:/tools/opencv")
@@ -97,6 +108,8 @@ runs:
             dll_list = find_dlls()
             if sys.platform.startswith("win"):
                 dll_list.append(find_windows_dll())
+            elif sys.platform.startswith("darwin"):
+                dll_list.extend(get_opencv_dylib_paths())
             if sys.platform.startswith("linux"):
               targets_inside_wheel = [(f"{package_root_subdir}.libs/{path.name}", path, generate_info(path)) for path in dll_list]
             else:
