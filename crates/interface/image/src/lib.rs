@@ -13,7 +13,7 @@ mod rayon;
 pub use cpu::CpuImageProcessor;
 #[cfg(feature = "gpu")]
 pub use gpu::GpuImageProcessor;
-use ndarray::{Array, Dim};
+use ndarray::{Array, Array2, Dim};
 use opencv::core::{Mat, MatTraitConst as _};
 pub use rayon::RayonImageProcessor;
 
@@ -55,6 +55,22 @@ pub struct Mask {
     pub width: DimType,
     pub height: DimType,
     pub data: Vec<u8>,
+}
+
+impl Mask {
+    pub fn as_opencv_mat<'a>(&'a self) -> Result<Mat, opencv::Error> {
+        let mat = Mat::from_slice(&self.data)?;
+        let mat = mat.reshape(1, self.height as i32)?.clone_pointee();
+        Ok(mat)
+    }
+
+    pub fn as_nd(&self) -> Array2<u8> {
+        Array2::from_shape_vec(
+            (self.height as usize, self.width as usize),
+            self.data.clone(),
+        )
+        .unwrap()
+    }
 }
 
 #[cfg(feature = "debug")]

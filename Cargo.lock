@@ -610,6 +610,7 @@ dependencies = [
  "interface-model",
  "maplit",
  "ndarray",
+ "opencv",
  "ort",
  "roots",
  "util",

@@ -1,44 +1,80 @@
-use imageproc::{distance_transform::Norm, image::GrayImage, morphology::erode};
+use imageproc::{
+    distance_transform::Norm,
+    image::{DynamicImage, GenericImageView, GrayImage},
+    morphology::erode,
+};
 
 use interface_detector::textlines::Quadrilateral;
 use interface_image::{Mask, RawImage};
-use ndarray::{Array2, Zip};
+use ndarray::{s, Array2, ArrayView2, Zip};
+use opencv::{
+    core::{
+        bitwise_or, bitwise_xor, in_range, no_array, subtract, sum_elems, Mat, MatExprTraitConst,
+        MatTrait as _, MatTraitConst, MatTraitConstManual as _, Point, Rect, Scalar, Size,
+        BORDER_CONSTANT, CV_16U, CV_8U,
+    },
+    imgproc::{get_structuring_element, MORPH_ELLIPSE, MORPH_RECT, THRESH_BINARY, THRESH_OTSU},
+};
 use roots::find_roots_quadratic;
 
-fn refine_mask(img: RawImage, mask: Mask, blk_list: Vec<Quadrilateral>) -> Mask {
-    let mask_refined = Mask {
-        data: vec![0; mask.width as usize * mask.height as usize],
-        width: mask.width,
-        height: mask.height,
-    };
+pub fn refine_mask(
+    img: RawImage,
+    mask: Mask,
+    blk_list: Vec<Quadrilateral>,
+    refinemask_inpaint: bool,
+) -> Mask {
+    let mut mask_refined = Mat::zeros(mask.height as i32, mask.width as i32, CV_8U)
+        .unwrap()
+        .to_mat()
+        .unwrap();
     for blk in blk_list {
         let (bx1, by1, bx2, by2) = enlarge_window(blk.xyxy(), img.width, img.height, 2.5, 1.0);
-        // let im = img[by1: by2, bx1: bx2];
-        // let msk = pred_mask[by1: by2, bx1: bx2];
-        // if len(im.shape) == 3 and im.shape[-1] == 3:
-        //   im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+        let im = DynamicImage::from(
+            DynamicImage::from(img.clone().to_image().unwrap())
+                .view(
+                    bx1 as u32,
+                    by1 as u32,
+                    (bx2 - bx1) as u32,
+                    (by2 - by1) as u32,
+                )
+                .to_image(),
+        );
+        let im_gray = im.clone().into_luma8();
+        let im_gray = Mask::from(im_gray).as_nd();
+        let msk = mask.as_nd();
+        let msk = msk.slice(s![by1 as usize..by2 as usize, bx1 as usize..bx2 as usize]);
+        let mut mask_list = get_topk_masklist(im_gray, &msk);
+        mask_list.extend(get_otsuthresh_masklist(&RawImage::from(im), msk));
+        let mask_merged = merge_mask_list(mask_list, &Mask::from(msk), 30, refinemask_inpaint);
+        let roi_rect = Rect::new(
+            bx1 as i32,
+            by1 as i32,
+            bx2 as i32 - bx1 as i32,
+            by2 as i32 - by1 as i32,
+        );
+        let mut roi = Mat::roi_mut(&mut mask_refined, roi_rect).unwrap();
+        let roy2 = roi.clone_pointee();
 
-        let mask_list = get_topk_masklist(im, msk);
-        mask_list.extend(get_otsuthresh_masklist(&img, msk));
-        // mask_merged = merge_mask_list(mask_list, msk, blk=blk, text_window=[bx1, by1, bx2, by2], refine_mode=refine_mode)
-        // mask_refined[by1: by2, bx1: bx2] = cv2.bitwise_or(mask_refined[by1: by2, bx1: bx2], mask_merged)
+        bitwise_or(&roy2, &mask_merged, &mut roi, &opencv::core::no_array()).unwrap();
     }
-    mask_refined
+    Mask::from(mask_refined)
 }
 
-fn ndarray_to_gray_image(arr: &Array2<u8>) -> GrayImage {
+fn ndarray_to_gray_image(arr: &ArrayView2<u8>) -> GrayImage {
     let data = arr
         .as_slice()
         .map(|v| v.to_vec())
-        .unwrap_or_else(|| arr.clone().into_iter().collect());
+        .unwrap_or_else(|| arr.iter().cloned().collect());
     GrayImage::from_raw(arr.dim().1 as u32, arr.dim().0 as u32, data).unwrap()
 }
 
 fn gray_image_to_ndarray(img: &GrayImage) -> Array2<u8> {
-    todo!()
+    let (width, height) = img.dimensions();
+    let data = img.as_raw();
+    Array2::from_shape_vec((height as usize, width as usize), data.clone()).unwrap()
 }
 
-fn extract_candidates(im_grey: &Array2<u8>, mask: &Array2<u8>) -> Vec<u8> {
+fn extract_candidates(im_grey: &Array2<u8>, mask: &ArrayView2<u8>) -> Vec<u8> {
     let mask_img = ndarray_to_gray_image(mask);
     let eroded_img = erode(&mask_img, Norm::LInf, 1);
     let eroded_mask = gray_image_to_ndarray(&eroded_img);
@@ -51,18 +87,28 @@ fn extract_candidates(im_grey: &Array2<u8>, mask: &Array2<u8>) -> Vec<u8> {
     result
 }
 
-fn get_topk_masklist(im_grey: Array2<u8>, ped_mask: Array2<u8>) -> Vec<(Array2<u8>, u64)> {
+fn get_topk_masklist(im_grey: Array2<u8>, ped_mask: &ArrayView2<u8>) -> Vec<(Array2<u8>, u64)> {
     let candidate_grey_px = extract_candidates(&im_grey, &ped_mask);
     let (bin, his) = histogram(&candidate_grey_px, 255);
     let topk_color = get_topk_color(his, bin, 3, 10, 0.001);
     let color_range = 30;
     topk_color
         .into_iter()
-        .enumerate()
-        .map(|(ii, color)| {
+        .map(|color| {
             let c_top = 255.min(color + color_range);
             let c_bottom = c_top - 2 * color_range;
-            let threshed = cv2.inRange(im_grey, c_bottom, c_top);
+            let mut threshed = Mat::default();
+            let im_grey = Mask::from(&im_grey).as_opencv_mat().unwrap();
+
+            in_range(
+                &im_grey,
+                &Scalar::all(c_bottom as f64),
+                &Scalar::all(c_top as f64),
+                &mut threshed,
+            )
+            .unwrap();
+            let threshed = Mask::from(threshed).as_nd();
+
             let (threshed, xor_sum) = minxor_thresh(threshed, &ped_mask, false);
             (threshed, xor_sum)
         })
@@ -74,6 +120,7 @@ fn argsort_descending(v: &[i32]) -> Vec<usize> {
     indices.sort_by_key(|&i| -v[i]);
     indices
 }
+
 fn get_topk_color(
     color_list: Vec<u32>,
     bins: Vec<usize>,
@@ -81,6 +128,12 @@ fn get_topk_color(
     color_var: u32,
     bin_tol: f64,
 ) -> Vec<u32> {
+    let color_list_ = color_list;
+    let color_list = bins;
+    let bins = color_list_
+        .into_iter()
+        .map(|v| v as usize)
+        .collect::<Vec<_>>();
     let idx = argsort_descending(&bins.iter().map(|v| *v as i32).collect::<Vec<_>>());
     let mut color_list = idx.iter().map(|v| color_list[*v]);
     let bins = idx.iter().map(|v| bins[*v]).collect::<Vec<_>>();
@@ -97,7 +150,7 @@ fn get_topk_color(
             break;
         }
     }
-    top_colors
+    top_colors.into_iter().map(|v| v as u32).collect()
 }
 
 fn histogram(candidate_grey_px: &[u8], bins: usize) -> (Vec<usize>, Vec<u32>) {
@@ -116,73 +169,265 @@ fn histogram(candidate_grey_px: &[u8], bins: usize) -> (Vec<usize>, Vec<u32>) {
     (bin_edges, hist)
 }
 
-// def merge_mask_list(mask_list, pred_mask, blk: Quadrilateral = None, pred_thresh=30, text_window=None, filter_with_lines=False, refine_mode=REFINEMASK_INPAINT):
-//     mask_list.sort(key=lambda x: x[1])
-//     linemask = None
-//     if blk is not None and filter_with_lines:
-//         linemask = np.zeros_like(pred_mask)
-//         lines = blk.pts.astype(np.int64)
-//         for line in lines:
-//             line[..., 0] -= text_window[0]
-//             line[..., 1] -= text_window[1]
-//             cv2.fillPoly(linemask, [line], 255)
-//         linemask = cv2.dilate(linemask, np.ones((3, 3), np.uint8), iterations=3)
+fn merge_mask_list_(
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    labels: &Mat,
+    label_index: i32,
+    mask_merged: &mut Mat,
+    pred_mask: &Mat,
+) {
+    let (x1, y1, x2, y2) = (x, y, x + w, y + h);
+    let width = x2 - x1;
+    let height = y2 - y1;
+    let roi_rect = Rect::new(x1, y1, width, height);
+    let label_local = Mat::roi(labels, roi_rect).unwrap();
+    let size = label_local.size().unwrap();
+    let mut tmp_merged = Mat::zeros(size.height, size.width, CV_8U)
+        .unwrap()
+        .to_mat()
+        .unwrap();
 
-//     if pred_thresh > 0:
-//         e_size = 1
-//         element = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * e_size + 1, 2 * e_size + 1),(e_size, e_size))
-//         pred_mask = cv2.erode(pred_mask, element, iterations=1)
-//         _, pred_mask = cv2.threshold(pred_mask, 60, 255, cv2.THRESH_BINARY)
-//     connectivity = 8
-//     mask_merged = np.zeros_like(pred_mask)
-//     for ii, (candidate_mask, xor_sum) in enumerate(mask_list):
-//         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(candidate_mask, connectivity, cv2.CV_16U)
-//         for label_index, stat, centroid in zip(range(num_labels), stats, centroids):
-//             if label_index != 0: # skip background label
-//                 x, y, w, h, area = stat
-//                 if w * h < 3:
-//                     continue
-//                 x1, y1, x2, y2 = x, y, x+w, y+h
-//                 label_local = labels[y1: y2, x1: x2]
-//                 label_coordinates = np.where(label_local==label_index)
-//                 tmp_merged = np.zeros_like(label_local, np.uint8)
-//                 tmp_merged[label_coordinates] = 255
-//                 tmp_merged = cv2.bitwise_or(mask_merged[y1: y2, x1: x2], tmp_merged)
-//                 xor_merged = cv2.bitwise_xor(tmp_merged, pred_mask[y1: y2, x1: x2]).sum()
-//                 xor_origin = cv2.bitwise_xor(mask_merged[y1: y2, x1: x2], pred_mask[y1: y2, x1: x2]).sum()
-//                 if xor_merged < xor_origin:
-//                     mask_merged[y1: y2, x1: x2] = tmp_merged
+    for y in 0..size.height {
+        for x in 0..size.width {
+            let val = *label_local.at_2d::<u16>(y, x).unwrap() as i32;
+            if val == label_index {
+                *tmp_merged.at_2d_mut::<u8>(y, x).unwrap() = 255;
+            }
+        }
+    }
+    let width = x2 - x1;
+    let height = y2 - y1;
+    let roi_rect = Rect::new(x1, y1, width, height);
 
-//     if refine_mode == REFINEMASK_INPAINT:
-//         mask_merged = cv2.dilate(mask_merged, np.ones((5, 5), np.uint8), iterations=1)
-//     # fill holes
-//     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(255-mask_merged, connectivity, cv2.CV_16U)
-//     sorted_area = np.sort(stats[:, -1])
-//     if len(sorted_area) > 1:
-//         area_thresh = sorted_area[-2]
-//     else:
-//         area_thresh = sorted_area[-1]
-//     for label_index, stat, centroid in zip(range(num_labels), stats, centroids):
-//         x, y, w, h, area = stat
-//         if area < area_thresh:
-//             x1, y1, x2, y2 = x, y, x+w, y+h
-//             label_local = labels[y1: y2, x1: x2]
-//             label_coordinates = np.where(label_local==label_index)
-//             tmp_merged = np.zeros_like(label_local, np.uint8)
-//             tmp_merged[label_coordinates] = 255
-//             tmp_merged = cv2.bitwise_or(mask_merged[y1: y2, x1: x2], tmp_merged)
-//             xor_merged = cv2.bitwise_xor(tmp_merged, pred_mask[y1: y2, x1: x2]).sum()
-//             xor_origin = cv2.bitwise_xor(mask_merged[y1: y2, x1: x2], pred_mask[y1: y2, x1: x2]).sum()
-//             if xor_merged < xor_origin:
-//                 mask_merged[y1: y2, x1: x2] = tmp_merged
-//     return mask_merged
+    let roi_mask_merged = Mat::roi(mask_merged, roi_rect).unwrap();
+    let roi_pred_mask = Mat::roi(pred_mask, roi_rect).unwrap();
+    let mut roi_tmp_merged = tmp_merged.clone();
 
-fn get_otsuthresh_masklist(img: &RawImage, pred_mask: Array2<u8>) -> Vec<(Array2<u8>, u64)> {
+    bitwise_or(
+        &roi_mask_merged,
+        &tmp_merged,
+        &mut roi_tmp_merged,
+        &no_array(),
+    )
+    .unwrap();
+
+    let mut xor_merged = Mat::default();
+    bitwise_xor(
+        &roi_tmp_merged,
+        &roi_pred_mask,
+        &mut xor_merged,
+        &no_array(),
+    )
+    .unwrap();
+    let xor_merged_sum = sum_elems(&xor_merged).unwrap().0[0] as i32;
+
+    let mut xor_origin = Mat::default();
+    bitwise_xor(
+        &roi_mask_merged,
+        &roi_pred_mask,
+        &mut xor_origin,
+        &no_array(),
+    )
+    .unwrap();
+    let xor_origin_sum = sum_elems(&xor_origin).unwrap().0[0] as i32;
+
+    if xor_merged_sum < xor_origin_sum {
+        let width = x2 - x1;
+        let height = y2 - y1;
+        let roi_rect = Rect::new(x1, y1, width, height);
+
+        let mut roi_mask_merged = Mat::roi_mut(mask_merged, roi_rect).unwrap();
+
+        tmp_merged.copy_to(&mut roi_mask_merged).unwrap();
+    }
+}
+
+fn get_area_threshold(stats: &Mat) -> opencv::Result<i32> {
+    let rows = stats.rows();
+    let mut areas = Vec::with_capacity(rows as usize);
+
+    for i in 0..rows {
+        let area = *stats.at_2d::<i32>(i, 4)?;
+        areas.push(area);
+    }
+
+    areas.sort_unstable();
+
+    let area_thresh = if areas.len() > 1 {
+        areas[areas.len() - 2]
+    } else {
+        areas[0]
+    };
+
+    Ok(area_thresh)
+}
+
+fn merge_mask_list(
+    mut mask_list: Vec<(Array2<u8>, u64)>,
+    pred_mask: &Mask,
+    pred_thresh: u32,
+    refinemask_inpaint: bool,
+) -> Mat {
+    mask_list.sort_by_key(|v| v.1);
+
+    let pred_mask = if pred_thresh > 0 {
+        let e_size = 1;
+        let element = opencv::imgproc::get_structuring_element(
+            MORPH_ELLIPSE,
+            Size::new(2 * e_size + 1, 2 * e_size + 1),
+            Point::new(e_size, e_size),
+        )
+        .unwrap();
+        let pred_mask = pred_mask.as_opencv_mat().unwrap();
+        let mut pred_mask_out = Mat::zeros(pred_mask.rows(), pred_mask.cols(), pred_mask.typ())
+            .unwrap()
+            .to_mat()
+            .unwrap();
+        opencv::imgproc::erode(
+            &pred_mask,
+            &mut pred_mask_out,
+            &element,
+            Point::new(-1, -1),
+            1,
+            BORDER_CONSTANT,
+            Scalar::all(0.0),
+        )
+        .unwrap();
+        let mut pred_mask = Mat::zeros(pred_mask.rows(), pred_mask.cols(), pred_mask.typ())
+            .unwrap()
+            .to_mat()
+            .unwrap();
+        opencv::imgproc::threshold(
+            &pred_mask_out,
+            &mut pred_mask,
+            60 as f64,
+            255 as f64,
+            THRESH_BINARY,
+        )
+        .unwrap();
+        pred_mask
+    } else {
+        todo!()
+    };
+
+    let size = pred_mask.size().unwrap();
+    let typ = pred_mask.typ();
+    let mut mask_merged = Mat::zeros_size(size, typ).unwrap().to_mat().unwrap();
+
+    let connectivity = 8;
+    for (candidate_mask, _) in mask_list.into_iter() {
+        let mut labels = Mat::default();
+        let mut stats = Mat::default();
+        let mut centroids = Mat::default();
+        let candidate_mask = Mask::from(candidate_mask).as_opencv_mat().unwrap();
+        let num_labels = opencv::imgproc::connected_components_with_stats(
+            &candidate_mask,
+            &mut labels,
+            &mut stats,
+            &mut centroids,
+            connectivity,
+            CV_16U,
+        )
+        .unwrap();
+        for label_index in 0..num_labels {
+            if label_index != 0 {
+                let stat = stats.at_row::<i32>(label_index).unwrap();
+                let (w, h) = (stat[2], stat[3]);
+                if w * h < 3 {
+                    continue;
+                }
+                let (x, y) = (stat[0], stat[1]);
+                merge_mask_list_(
+                    x,
+                    y,
+                    w,
+                    h,
+                    &labels,
+                    label_index,
+                    &mut mask_merged,
+                    &pred_mask,
+                );
+            }
+        }
+        if refinemask_inpaint {
+            let kernel = get_structuring_element(
+                MORPH_RECT,
+                Size::new(5, 5),
+                opencv::core::Point::new(-1, -1),
+            )
+            .unwrap();
+            let mut dst = Mat::default();
+            opencv::imgproc::dilate(
+                &mask_merged,
+                &mut dst,
+                &kernel,
+                opencv::core::Point::new(-1, -1),
+                1,
+                opencv::core::BORDER_CONSTANT,
+                Scalar::default(),
+            )
+            .unwrap();
+            mask_merged = dst;
+        }
+        let mut labels = Mat::default();
+        let mut stats = Mat::default();
+        let mut centroids = Mat::default();
+        let mut inverted = Mat::default();
+        let scalar_255 = Scalar::all(255.0);
+
+        subtract(
+            &scalar_255,
+            &mask_merged,
+            &mut inverted,
+            &opencv::core::no_array(),
+            -1,
+        )
+        .unwrap();
+        let num_labels = opencv::imgproc::connected_components_with_stats(
+            &inverted,
+            &mut labels,
+            &mut stats,
+            &mut centroids,
+            connectivity,
+            CV_16U,
+        )
+        .unwrap();
+        let area_thresh = get_area_threshold(&stats).unwrap();
+        for label_index in 0..num_labels {
+            let stat = stats.at_row::<i32>(label_index).unwrap();
+            let (x, y, w, h, area) = (stat[0], stat[1], stat[2], stat[3], stat[4]);
+            if area < area_thresh {
+                merge_mask_list_(
+                    x,
+                    y,
+                    w,
+                    h,
+                    &labels,
+                    label_index,
+                    &mut mask_merged,
+                    &pred_mask,
+                );
+            }
+        }
+    }
+    mask_merged
+}
+
+fn get_otsuthresh_masklist(img: &RawImage, pred_mask: ArrayView2<u8>) -> Vec<(Array2<u8>, u64)> {
     let channels = img.channels();
+    let h = img.height;
     let mask_list = channels
         .into_iter()
         .map(|c| {
-            let (_, threshed) = cv2.threshold(c, 1, 255, cv2.THRESH_OTSU + cv2.THRESH_BINARY);
+            let mut threshed = Mat::default();
+            let c = Mat::from_slice(&c).unwrap();
+            let c = c.reshape(1, h as i32).unwrap();
+            opencv::imgproc::threshold(&c, &mut threshed, 1.0, 255.0, THRESH_OTSU | THRESH_BINARY)
+                .unwrap();
+            let threshed = Mask::from(threshed).as_nd();
             let (threshed, xor_sum) = minxor_thresh(threshed, &pred_mask, false);
             (threshed, xor_sum)
         })
@@ -190,7 +435,7 @@ fn get_otsuthresh_masklist(img: &RawImage, pred_mask: Array2<u8>) -> Vec<(Array2
     vec![mask_list.into_iter().min_by_key(|v| v.1).unwrap()]
 }
 
-fn minxor_thresh(threshed: Array2<u8>, mask: &Array2<u8>, dilate: bool) -> (Array2<u8>, u64) {
+fn minxor_thresh(threshed: Array2<u8>, mask: &ArrayView2<u8>, dilate: bool) -> (Array2<u8>, u64) {
     let neg_threshed = threshed.clone().mapv(|v| 255 - v);
     if dilate {
         // let e_size = 1;
@@ -199,12 +444,14 @@ fn minxor_thresh(threshed: Array2<u8>, mask: &Array2<u8>, dilate: bool) -> (Arra
         // threshed = cv2.dilate(threshed, element, iterations=1)
         unimplemented!()
     }
+
     let neg_xor_sum = Zip::from(&neg_threshed)
         .and(mask)
         .fold(0u64, |acc, &x, &y| acc + (x ^ y) as u64);
     let xor_sum = Zip::from(&threshed)
         .and(mask)
         .fold(0u64, |acc, &x, &y| acc + (x ^ y) as u64);
+
     if neg_xor_sum < xor_sum {
         return (neg_threshed, neg_xor_sum);
     } else {
@@ -222,47 +469,39 @@ fn enlarge_window(
     assert!(ratio > 1.0);
     let w = x2 - x1;
     let h = y2 - y1;
-    // https://numpy.org/doc/stable/reference/generated/numpy.roots.html
 
-    let roots = find_roots_quadratic(
-        aspect_ratio,
-        w as f32 + h as f32 * aspect_ratio,
-        (1.0 - ratio) * w as f32 * h as f32,
-    );
+    let coeff_a = aspect_ratio;
+    let coeff_b = w as f32 + h as f32 * aspect_ratio;
+    let coeff_c = (1.0 - ratio) * w as f32 * h as f32;
 
-    let max = match roots {
+    let roots = find_roots_quadratic(coeff_a, coeff_b, coeff_c);
+
+    let valid_root = match roots {
         roots::Roots::No(_) => None,
-        roots::Roots::One(one) => Some(one[0]),
-        roots::Roots::Two(two) => {
-            let f = two[0];
-            let s = two[1];
-
-            Some(match f < s {
-                true => s,
-                false => f,
-            })
-        }
-        roots::Roots::Three(t) => t.iter().cloned().fold(None, |max, x| match max {
-            None => Some(x),
-            Some(y) => Some(if x.partial_cmp(&y) == Some(std::cmp::Ordering::Greater) {
-                x
-            } else {
-                y
-            }),
-        }),
-        roots::Roots::Four(f) => f.iter().cloned().fold(None, |max, x| match max {
-            None => Some(x),
-            Some(y) => Some(if x.partial_cmp(&y) == Some(std::cmp::Ordering::Greater) {
-                x
-            } else {
-                y
-            }),
-        }),
+        roots::Roots::One(one) => one.into_iter().find(|r| r.is_finite() && *r > 0.0),
+        roots::Roots::Two(two) => two
+            .iter()
+            .copied()
+            .filter(|r| r.is_finite() && *r > 0.0)
+            .max_by(|a, b| a.partial_cmp(b).unwrap()),
+        roots::Roots::Three(t) => t
+            .iter()
+            .copied()
+            .filter(|r| r.is_finite() && *r > 0.0)
+            .max_by(|a, b| a.partial_cmp(b).unwrap()),
+        roots::Roots::Four(t) => t
+            .iter()
+            .copied()
+            .filter(|r| r.is_finite() && *r > 0.0)
+            .max_by(|a, b| a.partial_cmp(b).unwrap()),
     };
-    let max = max.unwrap();
+
+    let max = valid_root.expect("No valid root found");
     let delta = (max / 2.0).round() as i64;
-    let delta_w = (delta as f32 * aspect_ratio) as i64;
-    let delta_w = i64::min(x1.min(delta_w), im_w as i64 - x2);
-    let delta = i64::min(y1.min(delta), im_h as i64 - y2);
+    let delta_w = (delta as f32 * aspect_ratio).round() as i64;
+
+    let delta_w = *[x1, im_w as i64 - x2, delta_w].iter().min().unwrap();
+    let delta = *[y1, im_h as i64 - y2, delta].iter().min().unwrap();
+
     (x1 - delta_w, y1 - delta, x2 + delta_w, y2 + delta)
 }

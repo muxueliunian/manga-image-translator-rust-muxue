@@ -1,4 +1,5 @@
-use ndarray::{Array2, Array3};
+use image::{DynamicImage, GrayImage};
+use ndarray::{Array2, Array3, ArrayView2};
 use opencv::core::{Mat, MatTraitConst as _};
 
 use crate::{DimType, Mask, RawImage};
@@ -39,6 +40,17 @@ impl TryFrom<Mat> for RawImage {
     }
 }
 
+impl From<DynamicImage> for RawImage {
+    fn from(value: DynamicImage) -> Self {
+        Self {
+            width: value.width() as DimType,
+            height: value.height() as DimType,
+            channels: 3,
+            data: value.into_rgb8().as_raw().to_vec(),
+        }
+    }
+}
+
 impl From<Mask> for RawImage {
     fn from(mask: Mask) -> Self {
         RawImage {
@@ -74,20 +86,95 @@ impl From<Array2<u8>> for RawImage {
     }
 }
 
+impl From<Mat> for Mask {
+    fn from(value: Mat) -> Self {
+        let resized = if value.is_continuous() {
+            value
+        } else {
+            value.clone()
+        };
+
+        let size = resized.size().unwrap();
+        let rows = size.height as usize;
+        let cols = size.width as usize;
+        let channels = resized.channels() as usize;
+
+        assert_eq!(channels, 1);
+
+        let total_len = rows * cols * channels;
+        let data: &[u8] = unsafe { std::slice::from_raw_parts(resized.data(), total_len) };
+
+        Self {
+            data: data.to_vec(),
+            width: cols as DimType,
+            height: rows as DimType,
+        }
+    }
+}
+
+impl From<GrayImage> for Mask {
+    fn from(value: GrayImage) -> Self {
+        let (w, h) = value.dimensions();
+        Mask {
+            width: w as DimType,
+            height: h as DimType,
+            data: value.into_raw(),
+        }
+    }
+}
+impl From<&GrayImage> for Mask {
+    fn from(value: &GrayImage) -> Self {
+        let (w, h) = value.dimensions();
+        Mask {
+            width: w as DimType,
+            height: h as DimType,
+            data: value.as_raw().clone(),
+        }
+    }
+}
+
+impl From<&Array2<u8>> for Mask {
+    fn from(mask: &Array2<u8>) -> Self {
+        let (height, width) = mask.dim();
+
+        let data = mask
+            .as_slice()
+            .map(|v| v.to_vec())
+            .unwrap_or_else(|| mask.iter().copied().collect());
+
+        Mask {
+            data,
+            width: width as u16,
+            height: height as u16,
+        }
+    }
+}
+
+impl From<ArrayView2<'_, u8>> for Mask {
+    fn from(mask: ArrayView2<'_, u8>) -> Self {
+        let (height, width) = mask.dim();
+
+        let data = mask
+            .as_slice()
+            .map(|v| v.to_vec())
+            .unwrap_or_else(|| mask.iter().copied().collect());
+
+        Mask {
+            data,
+            width: width as u16,
+            height: height as u16,
+        }
+    }
+}
+
 impl From<Array2<u8>> for Mask {
     fn from(mask: Array2<u8>) -> Self {
         let (height, width) = mask.dim();
-        let channels = 3;
-        let mut rgb = Array3::<u8>::zeros((height, width, channels));
-        for ((row, col), &val) in mask.indexed_iter() {
-            rgb[[row, col, 0]] = val;
-            rgb[[row, col, 1]] = val;
-            rgb[[row, col, 2]] = val;
-        }
-        let data = rgb
+
+        let data = mask
             .as_slice()
             .map(|v| v.to_vec())
-            .unwrap_or_else(|| rgb.into_iter().collect());
+            .unwrap_or_else(|| mask.into_iter().collect());
 
         Mask {
             data,

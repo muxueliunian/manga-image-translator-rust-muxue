@@ -85,12 +85,13 @@ impl Detector for CtdDetector {
         let (lines_map, mask) = match shoud_rearrange(&img, 1024) {
             true => {
                 let v = |batch| det_batch_forward_ctd(session, batch);
-                let (lines_map, mask) = det_rearrange_forward(img, 1024, 4, v, img_processor)?;
+                let (lines_map, mask) =
+                    det_rearrange_forward(img.clone(), 1024, 4, v, img_processor)?;
                 (lines_map, mask)
             }
             false => {
                 let (img_in, _, dw, dh) =
-                    preprocess_img(img, img_processor, (1024, 1024), true, false)?;
+                    preprocess_img(img.clone(), img_processor, (1024, 1024), true, false)?;
                 let tensor = Tensor::from_array(img_in)?;
                 let outputs = session.run(ort::inputs!["input" => tensor])?;
 
@@ -149,10 +150,14 @@ impl Detector for CtdDetector {
             .collect::<Vec<_>>();
         let mask =
             img_processor.resize_mask(mask, im_w as usize, im_h as usize, Interpolation::Bilinear);
-        //TODO:
-        //mask_refined = refine_mask(image, mask, textlines, refine_mode=None)
+        RawImage::from(mask.clone())
+            .to_image()
+            .unwrap()
+            .save("./maskb.png")
+            .unwrap();
+        let mask_refined = refine_mask::refine_mask(img, mask, qu.clone(), false);
 
-        Ok((qu, mask))
+        Ok((qu, mask_refined))
     }
 }
 fn det_batch_forward_ctd(
@@ -257,13 +262,20 @@ mod tests {
         let cpu_image_processor =
             Box::new(CpuImageProcessor::default()) as Box<dyn ImageOp + Send + Sync>;
         data.load().expect("Failed to load data");
-        let img = RawImage::new("./imgs/01_1-optimized.png").expect("Failed to load image");
-        data.detect(
-            &img,
-            PreprocessorOptions::default(),
-            &[],
-            &cpu_image_processor,
-        )
-        .expect("failed to detect");
+        let img = RawImage::new("./imgs/232265329-6a560438-e887-4f7f-b6a1-a61b8648f781.png")
+            .expect("Failed to load image");
+        let (_, mask) = data
+            .detect(
+                &img,
+                PreprocessorOptions::default(),
+                &[],
+                &cpu_image_processor,
+            )
+            .expect("failed to detect");
+        RawImage::from(mask)
+            .to_image()
+            .unwrap()
+            .save("./mask.png")
+            .unwrap();
     }
 }
