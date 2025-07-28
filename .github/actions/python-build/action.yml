@@ -4,6 +4,9 @@ inputs:
   name:
     description: Name of the wheel package
     required: true
+  os:
+    description: Operating system
+    required: true
 
 runs:
   using: "composite"
@@ -128,8 +131,6 @@ runs:
             dll_list = find_dlls()
             if sys.platform.startswith("win"):
                 dll_list.append(find_windows_dll())
-            elif sys.platform.startswith("darwin"):
-                dll_list.extend(get_opencv_dylib_paths())
             if sys.platform.startswith("linux"):
               targets_inside_wheel = [(f"{package_root_subdir}.libs/{path.name}", path, generate_info(path)) for path in dll_list]
             else:
