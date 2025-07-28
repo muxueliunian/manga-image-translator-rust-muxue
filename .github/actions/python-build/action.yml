@@ -14,10 +14,27 @@ runs:
         maturin build --release
       shell: bash
 
-    - name: Install wheel package
-      run: pip install wheel
+    - name: Bundle OpenCV only
+      if: ${{ inputs.os == 'macos' }}
       shell: bash
+      run: |
+        pip install wheel delocate
+        mkdir -p target/wheels/fixed
+        for whl in target/wheels/rusty_manga_image_translator-*.whl; do
+          wheel_dir="tmp_unpacked_wheel"
+          lib_dir="tmp_libs"
 
+          rm -rf "$wheel_dir" "$lib_dir"
+          mkdir -p "$lib_dir"
+
+          cp /opt/homebrew/opt/opencv/lib/libopencv_*.dylib "$lib_dir"
+
+          delocate-patch -w target/wheels/fixed/ -d "$lib_dir" "$whl"
+        done
+
+        rm target/wheels/rusty_manga_image_translator-*.whl
+        mv target/wheels/fixed/*.whl target/wheels/
+        rmdir target/wheels/fixed
     - name: Write inject_dll.py script
       shell: bash
       run: |
@@ -108,8 +125,7 @@ runs:
             dll_list = find_dlls()
             if sys.platform.startswith("win"):
                 dll_list.append(find_windows_dll())
-            elif sys.platform.startswith("darwin"):
-                dll_list.extend(get_opencv_dylib_paths())
+
             if sys.platform.startswith("linux"):
               targets_inside_wheel = [(f"{package_root_subdir}.libs/{path.name}", path, generate_info(path)) for path in dll_list]
             else:
