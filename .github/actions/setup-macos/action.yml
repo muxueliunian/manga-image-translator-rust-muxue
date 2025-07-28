@@ -15,7 +15,7 @@ runs:
     - name: Install macOS dependencies
       shell: bash
       run: |
-        brew install llvm
+        brew install llvm opencv
         if [[ "${{ inputs.runs-on }}" == "macos-13" ]]; then
           brew install openssl@3
           echo 'export OPENSSL_DIR=$(brew --prefix openssl@3)' >> $GITHUB_ENV
