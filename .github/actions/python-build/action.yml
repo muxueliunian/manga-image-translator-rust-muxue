@@ -26,7 +26,6 @@ runs:
       run: |
         pip install wheel delocate
         mkdir -p target/wheels/fixed
-        export MACOSX_DEPLOYMENT_TARGET=11.0
         for whl in target/wheels/rusty_manga_image_translator-*.whl; do
         delocate-wheel -w target/wheels/fixed/ "$whl"
         done
