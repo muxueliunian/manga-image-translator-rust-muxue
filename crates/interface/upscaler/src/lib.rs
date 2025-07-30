@@ -1,6 +1,11 @@
-use interface_image::RawImage;
+use interface_image::{ImageOp, RawImage};
 
 pub trait Upscaler {
-    type Options;
-    fn upscale(&self, image: &RawImage, options: Self::Options) -> RawImage;
+    fn upscale(
+        &mut self,
+        image: &RawImage,
+        patch_size: Option<usize>,
+        padding: usize,
+        img_processor: &Box<dyn ImageOp + Send + Sync>,
+    ) -> Result<RawImage, base_util::error::Error>;
 }

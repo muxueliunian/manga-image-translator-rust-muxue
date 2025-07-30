@@ -12,6 +12,7 @@ log.workspace = true
 base-util.workspace = true
 tempfile.workspace = true
 ureq.workspace = true
+ort.workspace = true
 
 [dev-dependencies]
 env_logger.workspace = true

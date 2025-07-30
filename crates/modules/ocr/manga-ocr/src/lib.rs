@@ -4,7 +4,9 @@ use base_util::{error::PreProcessingError, onnx::new_session};
 use image::{DynamicImage, GenericImageView, RgbImage};
 use interface_detector::textlines::Quadrilateral;
 use interface_image::{ImageOp, Mask};
-use interface_model::{CreateData, Model, ModelLoadError, ModelSource};
+use interface_model::{
+    impl_model_load_helpers, CreateData, Model, ModelLoad, ModelLoadError, ModelSource,
+};
 use interface_ocr::QuadrilateralInfo;
 use maplit::hashmap;
 use ndarray::{s, stack, Array2, Array4, Axis};
@@ -50,32 +52,13 @@ impl MangaOCR {
     }
 }
 
-impl Model for MangaOCR {
-    fn name(&self) -> &'static str {
-        "manga-ocr"
-    }
-
-    fn kind(&self) -> &'static str {
-        "ocr"
-    }
-
-    fn models(&self) -> std::collections::HashMap<&'static str, interface_model::ModelSource> {
-        hashmap! {
-            "enc" => ModelSource { url: "https://huggingface.co/mayocream/manga-ocr-onnx/resolve/main/encoder_model.onnx?download=true", hash: "###" },
-            "dec" => ModelSource { url: "https://huggingface.co/mayocream/manga-ocr-onnx/resolve/main/decoder_model.onnx?download=true", hash: "###" },
-            "vocab" => ModelSource { url: "https://huggingface.co/mayocream/manga-ocr-onnx/resolve/main/vocab.txt?download=true", hash: "###" },
-        }
-    }
-
+impl ModelLoad for MangaOCR {
+    type T = MangaOCRModels;
     fn loaded(&self) -> bool {
         self.models.is_some()
     }
 
-    fn unload(&mut self) {
-        self.models = None;
-    }
-
-    fn load(&mut self) -> Result<(), interface_model::ModelLoadError> {
+    fn reload(&mut self) -> Result<&mut Self::T, interface_model::ModelLoadError> {
         let enc = self.download_model("enc", "encoder_model.onnx")?;
         let dec = self.download_model("dec", "decoder_model.onnx")?;
         let voc = self.download_model("vocab", "vocab.txt")?;
@@ -85,7 +68,27 @@ impl Model for MangaOCR {
             voc,
             self.db.providers.clone(),
         )?);
-        Ok(())
+        Ok(self.models.as_mut().unwrap())
+    }
+
+    fn get_model(&mut self) -> Option<&mut Self::T> {
+        self.models.as_mut()
+    }
+}
+
+impl Model for MangaOCR {
+    impl_model_load_helpers!("ocr", "manga-ocr");
+
+    fn models(&self) -> std::collections::HashMap<&'static str, interface_model::ModelSource> {
+        hashmap! {
+            "enc" => ModelSource { url: "https://huggingface.co/mayocream/manga-ocr-onnx/resolve/main/encoder_model.onnx?download=true", hash: "###" },
+            "dec" => ModelSource { url: "https://huggingface.co/mayocream/manga-ocr-onnx/resolve/main/decoder_model.onnx?download=true", hash: "###" },
+            "vocab" => ModelSource { url: "https://huggingface.co/mayocream/manga-ocr-onnx/resolve/main/vocab.txt?download=true", hash: "###" },
+        }
+    }
+
+    fn unload(&mut self) {
+        self.models = None;
     }
 }
 
@@ -118,12 +121,10 @@ impl interface_ocr::Ocr for MangaOCR {
         area: Quadrilateral,
         img_processor: &Box<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<QuadrilateralInfo> {
+        self.load()?;
         let sos_idnex = 2;
         let eos_index = 3;
         let special_tokens = 5;
-        if !self.loaded() {
-            self.load()?;
-        }
         let pre = preprocessor(image, img_processor)?;
 
         let t = Tensor::from_array(pre)?;

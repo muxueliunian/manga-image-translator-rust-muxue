@@ -1,10 +1,10 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use interface_detector::DefaultOptions;
 use interface_detector::Detector;
 use interface_detector::PreprocessorOptions;
 use interface_image::{CpuImageProcessor, ImageOp, RawImage};
 use interface_model::CreateData;
 use interface_model::Model;
+use interface_model::ModelLoad;
 use none::NoneDetector;
 
 fn criterion_benchmark(c: &mut Criterion) {

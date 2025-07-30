@@ -23,6 +23,14 @@
 | --------- | ----- | ------------------------------------------------------------------------ | ------------------------------------------------ |
 | manga-ocr | /     | [Docs](https://github.com/kha-white/manga-ocr/tree/master/manga_ocr_dev) | [GitHub](https://github.com/kha-white/manga-ocr) |
 
+## Upscaler
+
+| Model   | Paper                                     | Train                                                                          | Source                                                                                                        |
+| ------- | ----------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| ESRGAN  | [arxiv](https://arxiv.org/abs/2107.10833) | [Docs](https://github.com/xinntao/Real-ESRGAN/blob/master/docs/Training.md)    | [Github](https://github.com/xinntao/Real-ESRGAN)                                                              |
+| Waifu2x | [arxiv](http://arxiv.org/abs/1501.00092)  | [Docs](https://github.com/nagadomi/nunif/blob/master/waifu2x/docs/training.md) | [Github Maintained](https://github.com/nagadomi/nunif) [GitHub Original](https://github.com/nagadomi/waifu2x) |
+| Anime4k |                                           |                                                                                | [GitHub](https://github.com/bloc97/Anime4K)                                                                   |
+
 ## Translators
 
 | Model      | Paper                                                                                                                                                         | Train                                                  | Source                                                                                                                                                      |
@@ -67,7 +75,10 @@
   - [ ] gimp
   - [ ] html
   - [ ] png
-- [ ] upscaler python integration
+- [ ] upscaler
+  - [x] anime4k
+  - [x] waifu2x
+  - [ ] esrgan
 - [ ] translator python integration
   - [~] baidu
   - [~] caiyun

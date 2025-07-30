@@ -97,6 +97,49 @@ impl ImageOp for CpuImageProcessor {
         }
     }
 
+    fn add_border_center_wh(
+        &self,
+        image: super::RawImage,
+        width: DimType,
+        height: DimType,
+    ) -> super::RawImage {
+        let old_w = image.width;
+        let old_h = image.height;
+        let channels: u32 = 3;
+
+        if old_w > width && old_h > height {
+            return image;
+        }
+        let width = width.max(old_w);
+        let height = height.max(old_h);
+        let pad_x = (width - old_w) / 2;
+        let pad_y = (height - old_h) / 2;
+
+        let mut new_data = Vec::with_capacity(width as usize * height as usize * channels as usize);
+        new_data.resize(new_data.capacity(), 0);
+
+        for row in 0..old_h {
+            let partial = row as u32 * channels;
+            let src_start = old_w as u32 * partial;
+            let dst_start = ((row as u32 + pad_y as u32) * width as u32 + pad_x as u32) * channels;
+
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    image.data.as_ptr().add(src_start as usize),
+                    new_data.as_mut_ptr().add(dst_start as usize),
+                    (old_w as u32 * channels) as usize,
+                );
+            }
+        }
+
+        super::RawImage {
+            data: new_data,
+            width,
+            height,
+            channels: 3,
+        }
+    }
+
     fn remove_border(
         &self,
         image: super::RawImage,

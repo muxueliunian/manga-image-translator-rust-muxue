@@ -6,7 +6,7 @@ use base_util::{
 
 use interface_detector::{textlines::Quadrilateral, DefaultOptions, Detector};
 use interface_image::{DimType, ImageOp, Interpolation, Mask, RawImage};
-use interface_model::{CreateData, Model, ModelSource};
+use interface_model::{impl_model_load_helpers, CreateData, Model, ModelLoad, ModelSource};
 use log::debug;
 
 use ndarray::{array, Array2, Array3, Array4, ArrayViewD, Axis};
@@ -37,7 +37,27 @@ impl DbNetDetector {
     }
 }
 
+impl ModelLoad for DbNetDetector {
+    type T = Session;
+    fn loaded(&self) -> bool {
+        self.model.is_some()
+    }
+    fn reload(&mut self) -> Result<&mut Session, ModelLoadError> {
+        self.model = Some(new_session(
+            self.download_model("model", "model.onnx")?,
+            self.db.providers.clone(),
+        )?);
+        Ok(self.model.as_mut().unwrap())
+    }
+
+    fn get_model(&mut self) -> Option<&mut Self::T> {
+        self.model.as_mut()
+    }
+}
+
 impl Model for DbNetDetector {
+    impl_model_load_helpers!("detector", "dbnet");
+
     fn models(&self) -> std::collections::HashMap<&'static str, ModelSource> {
         hashmap! {
             "model"=> ModelSource {
@@ -47,28 +67,8 @@ impl Model for DbNetDetector {
         }
     }
 
-    fn loaded(&self) -> bool {
-        self.model.is_some()
-    }
-
     fn unload(&mut self) {
         self.model = None;
-    }
-
-    fn load(&mut self) -> Result<(), ModelLoadError> {
-        self.model = Some(new_session(
-            self.download_model("model", "model.onnx")?,
-            self.db.providers.clone(),
-        )?);
-        Ok(())
-    }
-
-    fn name(&self) -> &'static str {
-        "dbnet"
-    }
-
-    fn kind(&self) -> &'static str {
-        "detector"
     }
 }
 
@@ -98,13 +98,7 @@ impl Detector for DbNetDetector {
         img_processor: &Box<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<(Vec<Quadrilateral>, Mask)> {
         let options = DefaultOptions::parse(options)?;
-        let session = match &mut self.model {
-            None => {
-                self.load()?;
-                self.model.as_mut().expect("Model should be loaded")
-            }
-            Some(model) => model,
-        };
+        let session = self.load()?;
 
         let (db, mask, shape, ratio_w, ratio_h, pad_w, pad_h) =
             match shoud_rearrange(&img, options.detect_size as u32) {
@@ -249,7 +243,7 @@ mod tests {
     use base_util::RawSerializable as _;
     use interface_detector::{Detector, PreprocessorOptions};
     use interface_image::{CpuImageProcessor, ImageOp, RawImage};
-    use interface_model::{CreateData, Model as _};
+    use interface_model::{CreateData, Model as _, ModelLoad as _};
 
     #[test]
     fn load_unload() {

@@ -5,3 +5,4 @@ edition.workspace = true
 
 [dependencies]
 interface-image.workspace = true
+base-util.workspace = true

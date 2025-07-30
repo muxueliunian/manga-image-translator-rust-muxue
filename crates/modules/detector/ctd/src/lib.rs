@@ -7,7 +7,7 @@ use base_util::{
 
 use interface_detector::{textlines::Quadrilateral, Detector};
 use interface_image::{ImageOp, Interpolation, Mask, RawImage};
-use interface_model::{CreateData, Model, ModelSource};
+use interface_model::{impl_model_load_helpers, CreateData, Model, ModelLoad, ModelSource};
 use maplit::hashmap;
 use ndarray::{s, stack, Array2, Array4, ArrayViewD, Axis};
 use ort::{session::Session, value::Tensor};
@@ -27,35 +27,36 @@ impl CtdDetector {
         CtdDetector { db, model: None }
     }
 }
-impl Model for CtdDetector {
-    fn name(&self) -> &'static str {
-        "ctd"
+
+impl ModelLoad for CtdDetector {
+    type T = Session;
+    fn loaded(&self) -> bool {
+        self.model.is_some()
     }
 
-    fn kind(&self) -> &'static str {
-        "detector"
+    fn reload(&mut self) -> Result<&mut Self::T, base_util::error::ModelLoadError> {
+        self.model = Some(new_session(
+            self.download_model("model", "model.onnx")?,
+            self.db.providers.clone(),
+        )?);
+        Ok(self.model.as_mut().unwrap())
     }
+
+    fn get_model(&mut self) -> Option<&mut Self::T> {
+        self.model.as_mut()
+    }
+}
+
+impl Model for CtdDetector {
+    impl_model_load_helpers!("detector", "ctd");
 
     fn models(&self) -> std::collections::HashMap<&'static str, ModelSource> {
         hashmap! {
             "model" => ModelSource { url: "https://github.com/frederik-uni/manga-image-translator-rust/releases/download/ctd-v1.0.0/model.onnx", hash: "c921d44fea30913a1689dcb4d28faef664dfd0c9f895146d27342e52b823ec0c" }
         }
     }
-
-    fn loaded(&self) -> bool {
-        self.model.is_some()
-    }
-
     fn unload(&mut self) {
         self.model = None;
-    }
-
-    fn load(&mut self) -> Result<(), base_util::error::ModelLoadError> {
-        self.model = Some(new_session(
-            self.download_model("model", "model.onnx")?,
-            self.db.providers.clone(),
-        )?);
-        Ok(())
     }
 }
 
@@ -67,13 +68,7 @@ impl Detector for CtdDetector {
         img_processor: &Box<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<(Vec<Quadrilateral>, Mask)> {
         let (im_w, im_h) = (img.width, img.height);
-        let session = match &mut self.model {
-            None => {
-                self.load()?;
-                self.model.as_mut().expect("Model should be loaded")
-            }
-            Some(model) => model,
-        };
+        let session = self.load()?;
         let (lines_map, mask) = match shoud_rearrange(&img, 1024) {
             true => {
                 let v = |batch| det_batch_forward_ctd(session, batch);
@@ -232,7 +227,7 @@ mod tests {
 
     use interface_detector::{Detector as _, PreprocessorOptions};
     use interface_image::{CpuImageProcessor, ImageOp, RawImage};
-    use interface_model::{CreateData, Model as _};
+    use interface_model::{CreateData, Model as _, ModelLoad as _};
 
     use crate::CtdDetector;
 

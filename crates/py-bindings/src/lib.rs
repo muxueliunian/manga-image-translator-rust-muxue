@@ -204,7 +204,7 @@ impl PyDetector {
     fn load(&self) -> PyResult<()> {
         self.inner
             .lock()
-            .load()
+            .reload_()
             .map_err(|e| PyRuntimeError::new_err(e.to_string()))
     }
 
@@ -245,7 +245,7 @@ impl PyDetector {
     }
 
     fn loaded(&self) -> bool {
-        self.inner.lock().loaded()
+        self.inner.lock().loaded_()
     }
 }
 

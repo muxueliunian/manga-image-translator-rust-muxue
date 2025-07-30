@@ -5,6 +5,7 @@ members = [
     "crates/interface/*",
     "crates/modules/detector/*",
     "crates/modules/ocr/*",
+    "crates/modules/upscaler/*",
     "crates/modules/watermarks/lsb",
     "crates/modules/watermarks/rexiv",
     "crates/py-bindings",
@@ -12,7 +13,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.4.5"
+version = "0.5.0"
 edition = "2021"
 
 [workspace.dependencies]
@@ -46,6 +47,7 @@ interface-inpainter = { path = "crates/interface/inpainter" }
 interface-image = { path = "crates/interface/image" }
 interface-detector = { path = "crates/interface/detector" }
 interface-ocr = { path = "crates/interface/ocr" }
+interface-upscaler = { path = "crates/interface/upscaler" }
 show-image = "0.13"
 thiserror = "2.0.12"
 parking_lot = "0.12.4"
@@ -58,6 +60,7 @@ imageproc = "0.25.0"
 indicatif = { version = "0.18.0" }
 approx = "0.5.1"
 criterion = "0.6.0"
+half = "2.6.0"
 
 [patch.crates-io]
 clipper2c-sys = { git = "https://github.com/tirithen/clipper2c-sys" }

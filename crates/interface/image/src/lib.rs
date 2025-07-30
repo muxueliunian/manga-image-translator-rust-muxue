@@ -35,6 +35,18 @@ pub struct RawImage {
 }
 
 impl RawImage {
+    pub fn url(url: &str) -> anyhow::Result<Self> {
+        let mut img = ureq::get(url).call()?;
+        let body = img.body_mut();
+        let img = body.read_to_vec()?;
+        let img = image::load_from_memory(&img)?.to_rgb8();
+        Ok(RawImage {
+            width: img.width() as DimType,
+            height: img.height() as DimType,
+            channels: 3,
+            data: img.into_raw(),
+        })
+    }
     pub fn channels(&self) -> Vec<Vec<u8>> {
         let count = self.width as usize * self.height as usize;
         let mut r = Vec::with_capacity(count);
@@ -221,6 +233,7 @@ pub trait ImageOp {
     }
     fn add_border_wh(&self, image: RawImage, width: DimType, height: DimType) -> RawImage;
     fn add_border_center(&self, image: RawImage, target_side_length: DimType) -> RawImage;
+    fn add_border_center_wh(&self, image: RawImage, twidth: DimType, height: DimType) -> RawImage;
     fn remove_border(&self, image: RawImage, width: DimType, height: DimType) -> RawImage;
     fn remove_border_center(&self, image: RawImage, width: DimType, height: DimType) -> RawImage;
     fn rotate_right(&self, image: RawImage) -> RawImage;
@@ -253,4 +266,110 @@ pub enum Interpolation {
     Bilinear,
     Bicubic,
     Lanczos3,
+}
+
+pub fn generate_patches_m(img: RawImage, patch_size: usize, margin: usize) -> Vec<RawImage> {
+    let p = margin;
+    let total_size = patch_size + 2 * p;
+    let n_x = (img.width as usize + patch_size - 1) / patch_size;
+    let n_y = (img.height as usize + patch_size - 1) / patch_size;
+    let mut patches = Vec::with_capacity(n_x * n_y);
+
+    for i in 0..n_y {
+        let y0 = i * patch_size;
+        for j in 0..n_x {
+            let x0 = j * patch_size;
+            let mut patch_data = vec![0; total_size * total_size * 3];
+
+            for local_y in 0..total_size {
+                let global_y = y0 as i32 - p as i32 + local_y as i32;
+                for local_x in 0..total_size {
+                    let global_x = x0 as i32 - p as i32 + local_x as i32;
+
+                    if global_x >= 0
+                        && global_x < img.width as i32
+                        && global_y >= 0
+                        && global_y < img.height as i32
+                    {
+                        let src_idx =
+                            (global_y as usize * img.width as usize + global_x as usize) * 3;
+                        let dst_idx = (local_y * total_size + local_x) * 3;
+
+                        patch_data[dst_idx] = img.data[src_idx];
+                        patch_data[dst_idx + 1] = img.data[src_idx + 1];
+                        patch_data[dst_idx + 2] = img.data[src_idx + 2];
+                    }
+                }
+            }
+
+            patches.push(RawImage {
+                channels: 3,
+                width: total_size as DimType,
+                height: total_size as DimType,
+                data: patch_data,
+            });
+        }
+    }
+
+    patches
+}
+
+pub fn generate_patches(img: RawImage, patch_size: usize, padding: usize) -> Vec<RawImage> {
+    assert!(patch_size > padding * 2);
+    let patch_size = patch_size - padding * 2;
+    generate_patches_m(img, patch_size, padding)
+}
+pub fn combine_patches(
+    patches: Vec<RawImage>,
+    width: DimType,
+    height: DimType,
+    patch_size: usize,
+    padding: usize,
+) -> RawImage {
+    assert!(patch_size > padding * 2);
+    let patch_size = patch_size - padding * 2;
+    combine_patches_m(patches, width, height, patch_size, padding)
+}
+
+pub fn combine_patches_m(
+    patches: Vec<RawImage>,
+    width: DimType,
+    height: DimType,
+    patch_size: usize,
+    margin: usize,
+) -> RawImage {
+    let p = margin;
+    let total_size = patch_size + 2 * p;
+    let width_usize = width as usize;
+    let height_usize = height as usize;
+    let n_x = (width_usize + patch_size - 1) / patch_size;
+    let mut output_data = vec![0; width_usize * height_usize * 3];
+
+    for (idx, patch) in patches.iter().enumerate() {
+        let i = idx / n_x;
+        let j = idx % n_x;
+        let y0 = i * patch_size;
+        let x0 = j * patch_size;
+
+        let h = std::cmp::min(patch_size, height_usize - y0);
+        let w = std::cmp::min(patch_size, width_usize - x0);
+
+        for y in 0..h {
+            for x in 0..w {
+                let src_idx = ((y + p) * total_size + (x + p)) * 3;
+                let dst_idx = ((y0 + y) * width_usize + (x0 + x)) * 3;
+
+                output_data[dst_idx] = patch.data[src_idx];
+                output_data[dst_idx + 1] = patch.data[src_idx + 1];
+                output_data[dst_idx + 2] = patch.data[src_idx + 2];
+            }
+        }
+    }
+
+    RawImage {
+        channels: 3,
+        width,
+        height,
+        data: output_data,
+    }
 }

@@ -140,4 +140,18 @@ impl ImageOp for DummyImageProcessor {
     fn bgr_to_rgb(&self, img: super::RawImage) -> super::RawImage {
         img
     }
+
+    fn add_border_center_wh(
+        &self,
+        _: crate::RawImage,
+        width: DimType,
+        _: DimType,
+    ) -> crate::RawImage {
+        super::RawImage {
+            data: vec![0; width as usize * width as usize * 3],
+            width,
+            height: width,
+            channels: 3,
+        }
+    }
 }

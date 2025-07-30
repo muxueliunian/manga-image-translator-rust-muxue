@@ -3,42 +3,47 @@ use std::{collections::HashMap, vec};
 use base_util::error::ModelLoadError;
 use interface_detector::{textlines::Quadrilateral, Detector};
 use interface_image::{ImageOp, Mask, RawImage};
-use interface_model::{CreateData, Model, ModelSource};
+use interface_model::{impl_model_load_helpers, CreateData, Model, ModelLoad, ModelSource};
 
 pub struct NoneDetector {
     loaded: bool,
+    _data: (),
 }
 
 impl NoneDetector {
     pub fn new(_: CreateData) -> Box<Self> {
-        Box::new(NoneDetector { loaded: true })
+        Box::new(NoneDetector {
+            loaded: true,
+            _data: (),
+        })
+    }
+}
+
+impl ModelLoad for NoneDetector {
+    type T = ();
+    fn loaded(&self) -> bool {
+        self.loaded
+    }
+
+    fn reload(&mut self) -> Result<&mut (), ModelLoadError> {
+        self.loaded = true;
+        Ok(&mut self._data)
+    }
+
+    fn get_model(&mut self) -> Option<&mut Self::T> {
+        Some(&mut self._data)
     }
 }
 
 impl Model for NoneDetector {
-    fn name(&self) -> &'static str {
-        "none"
-    }
-
-    fn kind(&self) -> &'static str {
-        "detector"
-    }
+    impl_model_load_helpers!("detector", "none");
 
     fn models(&self) -> std::collections::HashMap<&'static str, ModelSource> {
         HashMap::new()
     }
 
-    fn loaded(&self) -> bool {
-        self.loaded
-    }
-
     fn unload(&mut self) {
         self.loaded = false;
-    }
-
-    fn load(&mut self) -> Result<(), ModelLoadError> {
-        self.loaded = true;
-        Ok(())
     }
 }
 
@@ -65,7 +70,7 @@ mod tests {
 
     use interface_detector::{Detector as _, PreprocessorOptions};
     use interface_image::{CpuImageProcessor, ImageOp, RawImage};
-    use interface_model::{CreateData, Model as _};
+    use interface_model::{CreateData, Model as _, ModelLoad as _};
 
     use crate::NoneDetector;
 

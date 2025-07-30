@@ -101,6 +101,46 @@ impl ImageOp for RayonImageProcessor {
         }
     }
 
+    fn add_border_center_wh(
+        &self,
+        image: super::RawImage,
+        width: DimType,
+        height: DimType,
+    ) -> super::RawImage {
+        let old_w = image.width;
+        let old_h = image.height;
+        let channels: u32 = 3;
+
+        if old_w > width && old_h > height {
+            return image;
+        }
+        let width = width.max(old_w);
+        let height = height.max(old_h);
+        let offset_x = (width - old_w) / 2;
+        let offset_y = (height - old_h) / 2;
+
+        let channels_usize = channels as usize;
+        let mut new_data = Vec::with_capacity(width as usize * height as usize * channels_usize);
+        new_data.resize(new_data.capacity(), 0);
+
+        new_data
+            .par_chunks_mut(width as usize * channels_usize)
+            .skip(offset_y as usize)
+            .zip(image.data.par_chunks((old_w as u32 * channels) as usize))
+            .take(old_h as usize)
+            .for_each(|(dst_row, src_row)| {
+                let start = offset_x as usize * channels_usize;
+                dst_row[start..start + src_row.len()].copy_from_slice(src_row);
+            });
+
+        super::RawImage {
+            data: new_data,
+            width,
+            height,
+            channels: 3,
+        }
+    }
+
     fn remove_border(
         &self,
         image: super::RawImage,

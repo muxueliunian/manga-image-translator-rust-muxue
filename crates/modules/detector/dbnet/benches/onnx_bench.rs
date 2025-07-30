@@ -6,7 +6,7 @@ use interface_detector::Detector;
 use interface_detector::PreprocessorOptions;
 use interface_image::{CpuImageProcessor, ImageOp, RawImage};
 use interface_model::CreateData;
-use interface_model::Model;
+use interface_model::ModelLoad;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut data = DbNetDetector::new(CreateData::all(), false);

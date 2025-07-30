@@ -9,7 +9,7 @@ use geo::{MinimumRotatedRect, Point};
 
 use interface_detector::{textlines::Quadrilateral, DefaultOptions, Detector};
 use interface_image::{ImageOp, Mask, RawImage};
-use interface_model::{CreateData, Model, ModelSource};
+use interface_model::{impl_model_load_helpers, CreateData, Model, ModelLoad, ModelSource};
 use maplit::hashmap;
 use ort::session::builder::SessionBuilder;
 use paddle_ocr_rs::{base_net::BaseNet, db_net::DbNet, scale_param::ScaleParam};
@@ -29,31 +29,12 @@ impl PaddleDetector {
 fn ses_builder(v: SessionBuilder) -> Result<SessionBuilder, ort::Error> {
     new_session_(v, all_providers())
 }
-
-impl Model for PaddleDetector {
-    fn name(&self) -> &'static str {
-        "paddle"
-    }
-
-    fn kind(&self) -> &'static str {
-        "detector"
-    }
-
-    fn models(&self) -> std::collections::HashMap<&'static str, ModelSource> {
-        hashmap! {
-            "det" => ModelSource { url: "https://github.com/frederik-uni/manga-image-translator-rust/releases/download/paddle-ocr-chinese-v4/det.onnx", hash: "b21a993484b367c0ea29d4a703c038d6ee3212173e6abf962b09188b032a9483" },
-        }
-    }
-
+impl ModelLoad for PaddleDetector {
+    type T = DbNet;
     fn loaded(&self) -> bool {
         self.db_net.is_some()
     }
-
-    fn unload(&mut self) {
-        self.db_net = None;
-    }
-
-    fn load(&mut self) -> Result<(), ModelLoadError> {
+    fn reload(&mut self) -> Result<&mut DbNet, ModelLoadError> {
         let mut db_net = DbNet::new();
 
         let model = self
@@ -70,7 +51,24 @@ impl Model for PaddleDetector {
             })?;
         }
         self.db_net = Some(db_net);
-        Ok(())
+        Ok(self.db_net.as_mut().unwrap())
+    }
+
+    fn get_model(&mut self) -> Option<&mut Self::T> {
+        self.db_net.as_mut()
+    }
+}
+impl Model for PaddleDetector {
+    impl_model_load_helpers!("detector", "paddle");
+
+    fn models(&self) -> std::collections::HashMap<&'static str, ModelSource> {
+        hashmap! {
+            "det" => ModelSource { url: "https://github.com/frederik-uni/manga-image-translator-rust/releases/download/paddle-ocr-chinese-v4/det.onnx", hash: "b21a993484b367c0ea29d4a703c038d6ee3212173e6abf962b09188b032a9483" },
+        }
+    }
+
+    fn unload(&mut self) {
+        self.db_net = None;
     }
 }
 
@@ -120,13 +118,7 @@ impl Detector for PaddleDetector {
         _: &Box<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<(Vec<Quadrilateral>, Mask)> {
         let options = DefaultOptions::parse(options)?;
-        let db_net = match &mut self.db_net {
-            None => {
-                self.load()?;
-                self.db_net.as_mut().expect("Model should be loaded")
-            }
-            Some(model) => model,
-        };
+        let db_net = self.load()?;
 
         let max_side_len = 960;
         let origin_max_side = img.width.max(img.height);
@@ -258,7 +250,7 @@ mod tests {
     use base_util::RawSerializable as _;
     use interface_detector::{DefaultOptions, Detector as _, PreprocessorOptions};
     use interface_image::{CpuImageProcessor, ImageOp, RawImage};
-    use interface_model::{CreateData, Model as _};
+    use interface_model::{CreateData, Model as _, ModelLoad};
 
     #[test]
     fn load_unload() {
