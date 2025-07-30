@@ -1,0 +1,13 @@
+[package]
+name = "waifu2x"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+interface-image.workspace = true
+interface-model.workspace = true
+interface-upscaler.workspace = true
+maplit.workspace = true
+ort.workspace = true
+ndarray.workspace = true
+base-util.workspace = true

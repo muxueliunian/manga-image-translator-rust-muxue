@@ -1,0 +1,14 @@
+[package]
+name = "anime4k"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ort = { workspace = true, features = ["half"] }
+base-util.workspace = true
+interface-image.workspace = true
+interface-model.workspace = true
+interface-upscaler.workspace = true
+maplit.workspace = true
+half.workspace = true
+ndarray.workspace = true

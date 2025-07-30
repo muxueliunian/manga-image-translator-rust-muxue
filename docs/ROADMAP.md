@@ -1,0 +1,80 @@
+# Roadmap
+
+- [x] detectors
+  - [x] dbnet
+  - [x] none
+  - [x] ctd
+  - [x] [paddle](https://github.com/mg-chao/paddle-ocr-rs)
+  - [x] dbnet_convnext
+  - [ ] ~~craft~~
+- [ ] ocr
+  - [ ] 32px
+  - [ ] 48px
+  - [ ] 48px_ctc
+  - [ ] mocr
+    - [x] greedy
+    - [ ] beam
+- [ ] inpainter
+  - [ ] default
+  - [ ] lama_large
+  - [ ] lama_mpe
+  - [ ] sd
+  - [ ] none
+  - [ ] original
+- [ ] colorizer
+  - [ ] none
+  - [ ] mc2
+- [ ] renderer
+  - [ ] json/struct
+  - [ ] gimp
+  - [ ] [psd](https://crates.io/crates/psd)
+  - [ ] gimp
+  - [ ] html
+  - [ ] png
+- [ ] upscaler
+  - [x] anime4k
+  - [x] waifu2x
+  - [ ] esrgan
+- [ ] translator
+  - [~] baidu
+  - [~] caiyun
+  - [~] google
+  - [~] m2m100
+  - [~] mbart
+  - [~] nllb
+  - [~] none
+  - [~] original
+  - [~] papgo
+  - [~] sugoi
+  - [~] jparacrawl
+  - [~] youdao
+  - [~] deepl
+  - [ ] qwen2
+  - [ ] chatgpt
+  - [ ] groq
+  - [ ] deepseek
+  - [ ] gemini
+  - [ ] sakrua
+- [ ] cleanup code
+- [ ] more tests(100% test coverage)
+- [ ] more benchmarks
+- [ ] optimize code
+- [~] error handling
+- [ ] replace clipper2
+- [ ] replace opencv
+- [x] ci
+  - [x] cargo build
+  - [x] gh publish
+  - [x] cargo test
+  - [x] cargo fmt
+  - [ ] cargo clippy
+  - [ ] cargo doc
+  - [ ] cargo tarpaulin
+  - [x] pyo3 publish
+    - [x] macos arm64
+    - [x] macos x86_64
+    - [x] linux x86_64
+    - [x] linux arm64
+    - [x] windows x86_64
+    - [ ] windows arm64(no prebuild clang)
+    - [ ] ~~windows x86~~
