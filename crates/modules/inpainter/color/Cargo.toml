@@ -1,0 +1,13 @@
+[package]
+name = "color"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+interface-model.workspace = true
+interface-inpainter.workspace = true
+interface-image.workspace = true
+anyhow.workspace = true
+ndarray.workspace = true
+[dev-dependencies]
+ndarray-npy.workspace = true

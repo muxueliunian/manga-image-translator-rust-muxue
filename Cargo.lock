@@ -71,7 +71,7 @@ checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
 
 [[package]]
 name = "anime4k"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "base-util",
  "half",
@@ -225,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "base-util"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "ndarray",
@@ -507,6 +507,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "color"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "interface-image",
+ "interface-inpainter",
+ "interface-model",
+ "ndarray",
+ "ndarray-npy",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -520,7 +532,7 @@ checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 
 [[package]]
 name = "colorizer"
-version = "0.6.0"
+version = "0.7.0"
 
 [[package]]
 name = "console"
@@ -562,7 +574,7 @@ dependencies = [
 
 [[package]]
 name = "craft"
-version = "0.6.0"
+version = "0.7.0"
 
 [[package]]
 name = "crc32fast"
@@ -649,7 +661,7 @@ dependencies = [
 
 [[package]]
 name = "ctd"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "base-util",
@@ -702,7 +714,7 @@ dependencies = [
 
 [[package]]
 name = "dbnet"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "base-util",
@@ -927,7 +939,7 @@ dependencies = [
 
 [[package]]
 name = "esrgan"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "base-util",
  "half",
@@ -1555,7 +1567,7 @@ dependencies = [
 
 [[package]]
 name = "interface-detector"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "approx",
@@ -1569,7 +1581,7 @@ dependencies = [
 
 [[package]]
 name = "interface-image"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "base-util",
@@ -1584,7 +1596,7 @@ dependencies = [
 
 [[package]]
 name = "interface-inpainter"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "interface-image",
@@ -1593,7 +1605,7 @@ dependencies = [
 
 [[package]]
 name = "interface-model"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "base-util",
  "env_logger 0.11.8",
@@ -1609,7 +1621,7 @@ dependencies = [
 
 [[package]]
 name = "interface-ocr"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "interface-detector",
@@ -1618,7 +1630,7 @@ dependencies = [
 
 [[package]]
 name = "interface-renderer"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "interface-image",
@@ -1627,11 +1639,11 @@ dependencies = [
 
 [[package]]
 name = "interface-translator"
-version = "0.6.0"
+version = "0.7.0"
 
 [[package]]
 name = "interface-upscaler"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "base-util",
  "interface-image",
@@ -1768,7 +1780,7 @@ dependencies = [
 
 [[package]]
 name = "lama_aot"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "base-util",
@@ -1784,10 +1796,27 @@ dependencies = [
 
 [[package]]
 name = "lama_large"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "base-util",
+ "interface-image",
+ "interface-inpainter",
+ "interface-model",
+ "maplit",
+ "ndarray",
+ "ndarray-npy",
+ "ort",
+ "util",
+]
+
+[[package]]
+name = "lama_mpe"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "base-util",
+ "fast_image_resize",
  "interface-image",
  "interface-inpainter",
  "interface-model",
@@ -1921,7 +1950,7 @@ dependencies = [
 
 [[package]]
 name = "lsb"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "image",
  "stego",
@@ -1929,7 +1958,7 @@ dependencies = [
 
 [[package]]
 name = "manga-ocr"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "base-util",
@@ -2095,19 +2124,6 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
-]
-
-[[package]]
-name = "none"
-version = "0.6.0"
-dependencies = [
- "anyhow",
- "base-util",
- "criterion",
- "interface-detector",
- "interface-image",
- "interface-model",
- "log",
 ]
 
 [[package]]
@@ -2410,7 +2426,7 @@ dependencies = [
 
 [[package]]
 name = "paddle"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "base-util",
@@ -3015,7 +3031,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "rexiv"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "rexiv2",
 ]
@@ -3145,14 +3161,13 @@ checksum = "8a0d197bd2c9dc6e53b84da9556a69ba4cdfab8619eb41a8bd1cc2027a0f6b1d"
 
 [[package]]
 name = "rusty-manga-image-translator"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "base-util",
  "dbnet",
  "interface-detector",
  "interface-image",
  "interface-model",
- "none",
  "numpy",
  "paddle",
  "parking_lot",
@@ -3805,7 +3820,7 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "util"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "base-util",
@@ -3875,7 +3890,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "waifu2x"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "base-util",
  "interface-image",

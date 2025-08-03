@@ -2,7 +2,6 @@
 
 - [x] detectors
   - [x] dbnet
-  - [x] none
   - [x] ctd
   - [x] [paddle](https://github.com/mg-chao/paddle-ocr-rs)
   - [x] dbnet_convnext
@@ -22,12 +21,12 @@
   - [ ] mocr
     - [x] greedy
     - [ ] beam
-- [ ] inpainter
-  - [ ] lama_aot
-  - [ ] lama_large
-  - [ ] lama_mpe
+- [x] inpainter
+  - [x] color
+  - [x] lama_aot
+  - [x] lama_large
+  - [x] lama_mpe
   - [ ] sd
-  - [ ] none
   - [ ] patchmatch
 - [ ] colorizer
   - [ ] none

@@ -1,0 +1,18 @@
+[package]
+name = "lama_mpe"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+interface-model.workspace = true
+interface-inpainter.workspace = true
+interface-image.workspace = true
+anyhow.workspace = true
+ndarray.workspace = true
+ort.workspace = true
+base-util.workspace = true
+maplit.workspace = true
+util.workspace = true
+fast_image_resize.workspace = true
+[dev-dependencies]
+ndarray-npy.workspace = true
