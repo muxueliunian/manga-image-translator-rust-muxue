@@ -10,11 +10,12 @@ members = [
     "crates/modules/watermarks/lsb",
     "crates/modules/watermarks/rexiv",
     "crates/py-bindings",
+    "crates/runtimes/simple-runtime",
     "crates/util",
 ]
 
 [workspace.package]
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 
 [workspace.dependencies]
@@ -61,6 +62,10 @@ indicatif = { version = "0.18.0" }
 approx = "0.5.1"
 criterion = "0.6.0"
 half = "2.6.0"
+clap = "4.5.42"
+walkdir = "2.5.0"
+config = { version = "0.15.13" }
+serde = "1.0.219"
 
 [patch.crates-io]
 clipper2c-sys = { git = "https://github.com/tirithen/clipper2c-sys" }

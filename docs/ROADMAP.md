@@ -42,20 +42,20 @@
   - [x] anime4k
   - [x] waifu2x
   - [x] esrgan
-- [ ] translator
-  - [~] baidu
-  - [~] caiyun
-  - [~] google
-  - [~] m2m100
-  - [~] mbart
-  - [~] nllb
-  - [~] none
-  - [~] original
-  - [~] papgo
-  - [~] sugoi
-  - [~] jparacrawl
-  - [~] youdao
-  - [~] deepl
+- [x] translator
+  - [x] baidu
+  - [x] caiyun
+  - [x] google
+  - [x] m2m100
+  - [x] mbart
+  - [x] nllb
+  - [x] none
+  - [x] original
+  - [x] papgo
+  - [x] sugoi
+  - [x] jparacrawl
+  - [x] youdao
+  - [x] deepl
   - [ ] qwen2
   - [ ] chatgpt
   - [ ] groq

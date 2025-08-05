@@ -1,0 +1,17 @@
+[package]
+name = "simple-runtime"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+clap = { workspace = true, features = ["derive", "color"] }
+walkdir.workspace = true
+config = { workspace = true, features = [
+    "json",
+    "json5",
+    "ini",
+    "ron",
+    "toml",
+    "yaml",
+] }
+serde = { workspace = true, features = ["derive"] }
