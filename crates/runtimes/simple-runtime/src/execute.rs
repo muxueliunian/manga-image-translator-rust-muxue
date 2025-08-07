@@ -139,9 +139,9 @@ fn visualize_textblocks(canvas: &RawImage, blk_list: &[TextBlock], show_panels: 
         //                 cv2.putText(canvas, str(panel_idx), (x1+5, y1+60), cv2.FONT_HERSHEY_SIMPLEX,
         //                            lw/2, (200, 100, 0), max(lw-1, 1), cv2.LINE_AA)
     }
-    let font_data =
-        include_bytes!("/System/Library/Fonts/Supplemental/AmericanTypewriter.ttc").to_vec();
-    let font_vec = FontVec::try_from_vec(font_data).unwrap();
+    // let font_data =
+    // include_bytes!("/System/Library/Fonts/Supplemental/AmericanTypewriter.ttc").to_vec();
+    // let font_vec = FontVec::try_from_vec(font_data).unwrap();
     for (i, blk) in blk_list.iter().enumerate() {
         let (bx1, by1, bx2, by2) = blk.xyxy();
         img = imageproc::drawing::draw_hollow_rect(
@@ -150,15 +150,15 @@ fn visualize_textblocks(canvas: &RawImage, blk_list: &[TextBlock], show_panels: 
             Rgb::<u8>::from_slice(&[127, 255, 127]).clone(),
         );
         for (j, line) in blk.lines.iter().enumerate() {
-            draw_text_mut(
-                &mut img,
-                Rgb::<u8>::from_slice(&[0, 127, 255]).clone(),
-                line[0].0 as i32,
-                line[0].1 as i32,
-                20.0,
-                &font_vec,
-                &j.to_string(),
-            );
+            // draw_text_mut(
+            //     &mut img,
+            //     Rgb::<u8>::from_slice(&[0, 127, 255]).clone(),
+            //     line[0].0 as i32,
+            //     line[0].1 as i32,
+            //     20.0,
+            //     &font_vec,
+            //     &j.to_string(),
+            // );
             draw_polyline_mut(
                 &mut img,
                 line,
@@ -175,15 +175,15 @@ fn visualize_textblocks(canvas: &RawImage, blk_list: &[TextBlock], show_panels: 
             );
         }
 
-        draw_text_mut(
-            &mut img,
-            Rgb::<u8>::from_slice(&[255, 127, 127]).clone(),
-            bx1 as i32,
-            by1 as i32 + 2,
-            1.0,
-            &font_vec,
-            &i.to_string(),
-        );
+        // draw_text_mut(
+        //     &mut img,
+        //     Rgb::<u8>::from_slice(&[255, 127, 127]).clone(),
+        //     bx1 as i32,
+        //     by1 as i32 + 2,
+        //     1.0,
+        //     &font_vec,
+        //     &i.to_string(),
+        // );
         let center = [(bx1 + bx2) / 2, (by1 + by2) / 2];
 
         let angle_text = format!("a: {:.2}", blk.angle);
