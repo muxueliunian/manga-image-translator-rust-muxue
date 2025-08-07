@@ -5,6 +5,7 @@ use interface_detector::DefaultOptions;
 use interface_detector::Detector;
 use interface_detector::PreprocessorOptions;
 use interface_image::{CpuImageProcessor, ImageOp, RawImage};
+use interface_model::Model;
 use interface_model::ModelLoad;
 
 fn criterion_benchmark(c: &mut Criterion) {
@@ -14,12 +15,12 @@ fn criterion_benchmark(c: &mut Criterion) {
     let cpu_image_processor =
         Box::new(CpuImageProcessor::default()) as Box<dyn ImageOp + Send + Sync>;
 
-    // c.bench_function("load_unload", |b| {
-    //     b.iter(|| {
-    //         data.load().expect("Failed to load model");
-    //         data.unload();
-    //     })
-    // });
+    c.bench_function("load_unload", |b| {
+        b.iter(|| {
+            data.load().expect("Failed to load model");
+            data.unload();
+        })
+    });
 
     c.bench_function("infer", |b| {
         data.load().expect("Failed to load model");
