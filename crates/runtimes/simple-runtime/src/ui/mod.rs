@@ -2,16 +2,24 @@ mod components;
 mod main;
 use std::path::PathBuf;
 
-use eframe::App;
-use egui::{Layout, ScrollArea};
-
 use crate::ui::components::file_upload_button;
+use eframe::App;
 
-#[derive(serde::Deserialize, serde::Serialize, Default)]
+#[derive(serde::Deserialize, serde::Serialize)]
 pub struct MitApp {
     files: Vec<PathBuf>,
     file_sidebar: bool,
     settings: Settings,
+}
+
+impl Default for MitApp {
+    fn default() -> Self {
+        Self {
+            files: Default::default(),
+            file_sidebar: true,
+            settings: Default::default(),
+        }
+    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Default)]
