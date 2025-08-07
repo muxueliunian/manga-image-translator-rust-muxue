@@ -12,7 +12,7 @@ runs:
   using: "composite"
   steps:
     - name: Symlink libcudnn.so to libcudnn.so.9 and export LD_LIBRARY_PATH
-      if: inputs.os == "linux"
+      if: ${{ inputs.os == 'linux' }}
       shell: bash
       run: |
         libpath=$(find target/release -type f -name 'libcudnn.so' -exec dirname {} \; | head -n1)
