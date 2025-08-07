@@ -41,3 +41,18 @@ textline-merge.workspace = true
 imageproc.workspace = true
 ab_glyph.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+env_logger.workspace = true
+
+# ui
+egui = "0.32"
+eframe = { version = "0.32", default-features = false, features = [
+    "default_fonts", # Embed the default egui fonts.
+    "glow",          # Use the glow rendering backend. Alternative: "wgpu".
+    "persistence",   # Enable restoring app state when restarting the app.
+    "wayland",       # To support Linux (and CI)
+    "x11",           # To support older Linux distributions (restores one of the default features)
+] }
+rfd = "0.15.4"
+
+[profile.dev.package."*"]
+opt-level = 2
