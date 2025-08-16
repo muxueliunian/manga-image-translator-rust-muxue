@@ -30,7 +30,7 @@ impl PaddleDetector {
 }
 
 fn ses_builder(v: SessionBuilder) -> Result<SessionBuilder, ort::Error> {
-    //TODO: fix
+    //TODO: dont start with all providers
     new_session_(v, all_providers())
 }
 impl ModelLoad for PaddleDetector {
