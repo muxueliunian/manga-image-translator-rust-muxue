@@ -9,6 +9,7 @@ members = [
     "crates/modules/detector/*",
     "crates/modules/inpainter/*",
     "crates/modules/ocr/*",
+    "crates/modules/renderer/*",
     "crates/modules/upscaler/*",
     "crates/modules/watermarks/lsb",
     "crates/modules/watermarks/rexiv",
@@ -85,6 +86,7 @@ ab_glyph = "0.2.31"
 ordered-float = { version = "5" }
 serde_json = "1.0.142"
 regex = "1.11.1"
+cosmic-text = "0.14.2"
 
 [patch.crates-io]
 clipper2c-sys = { git = "https://github.com/tirithen/clipper2c-sys" }

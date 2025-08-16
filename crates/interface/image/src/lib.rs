@@ -238,11 +238,21 @@ impl RawImage {
         Ok(mat)
     }
 
-    pub fn to_image(self) -> Option<image::RgbImage> {
-        #[cfg(feature = "u16-dims")]
-        return image::RgbImage::from_raw(self.width as u32, self.height as u32, self.data);
-        #[cfg(not(feature = "u16-dims"))]
-        image::RgbImage::from_raw(self.width, self.height, self.data)
+    pub fn to_image(self) -> Option<DynamicImage> {
+        match self.channels == 4 {
+            true => {
+                let rgba =
+                    image::RgbaImage::from_raw(self.width as u32, self.height as u32, self.data)
+                        .unwrap();
+                Some(DynamicImage::ImageRgba8(rgba))
+            }
+            false => {
+                let rgb =
+                    image::RgbImage::from_raw(self.width as u32, self.height as u32, self.data)
+                        .unwrap();
+                Some(DynamicImage::ImageRgb8(rgb))
+            }
+        }
     }
 
     pub fn new<P: AsRef<Path>>(path: P) -> anyhow::Result<RawImage> {

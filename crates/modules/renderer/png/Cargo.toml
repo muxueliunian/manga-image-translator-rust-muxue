@@ -1,0 +1,10 @@
+[package]
+name = "png"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+cosmic-text.workspace = true
+ordered-float.workspace = true
+interface-image.workspace = true
+opencv = { workspace = true, features = ["imgproc"] }

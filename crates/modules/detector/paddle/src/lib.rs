@@ -135,7 +135,7 @@ impl Detector for PaddleDetector {
 
         // let padding_src = OcrUtils::make_padding(img_src, padding).unwrap();
         let (w, h) = (img.width, img.height);
-        let img = img.to_image().unwrap();
+        let img = img.to_image().unwrap().to_rgb8();
 
         let scale = ScaleParam::get_scale_param(&img, resize as u32);
 
