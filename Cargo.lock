@@ -5157,6 +5157,7 @@ name = "png"
 version = "0.8.12"
 dependencies = [
  "cosmic-text",
+ "env_logger 0.11.8",
  "interface-image",
  "opencv",
  "ordered-float",

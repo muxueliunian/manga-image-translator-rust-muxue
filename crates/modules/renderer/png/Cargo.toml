@@ -8,3 +8,4 @@ cosmic-text.workspace = true
 ordered-float.workspace = true
 interface-image.workspace = true
 opencv = { workspace = true, features = ["imgproc"] }
+env_logger.workspace = true

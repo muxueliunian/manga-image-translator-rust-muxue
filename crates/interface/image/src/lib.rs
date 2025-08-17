@@ -35,7 +35,96 @@ pub struct RawImage {
     pub channels: u8,
 }
 
+fn blend_pixel(s_rgba: [u8; 4], o_rgba: [u8; 4]) -> [u8; 4] {
+    let sa = s_rgba[3] as f32 / 255.0;
+    let oa = o_rgba[3] as f32 / 255.0;
+
+    if oa >= 1.0 {
+        return o_rgba;
+    }
+
+    let out_a = oa + sa * (1.0 - oa);
+
+    let out_r =
+        ((o_rgba[0] as f32 * oa + s_rgba[0] as f32 * sa * (1.0 - oa)) / out_a).round() as u8;
+    let out_g =
+        ((o_rgba[1] as f32 * oa + s_rgba[1] as f32 * sa * (1.0 - oa)) / out_a).round() as u8;
+    let out_b =
+        ((o_rgba[2] as f32 * oa + s_rgba[2] as f32 * sa * (1.0 - oa)) / out_a).round() as u8;
+    let out_a = (out_a * 255.0).round() as u8;
+
+    [out_r, out_g, out_b, out_a]
+}
+
 impl RawImage {
+    pub fn apply(self, other: Self) -> Self {
+        assert_eq!(self.height, other.height);
+        assert_eq!(self.width, other.width);
+        let a = (self.channels == 4 || self.channels == 2)
+            && (other.channels == 4 || other.channels == 2);
+        assert!(a);
+        let mut out = Vec::with_capacity(self.width as usize * self.height as usize);
+        for h in 0..self.height {
+            for w in 0..self.width {
+                let s_rgba = self.rgba_pixel(w, h);
+                let o_rgba = other.rgba_pixel(w, h);
+                let p = blend_pixel(s_rgba, o_rgba);
+                out.push(p);
+            }
+        }
+        let len = out.len();
+        let capacity = out.capacity();
+
+        let ptr = out.as_ptr() as *mut u8;
+        std::mem::forget(out);
+
+        Self {
+            data: unsafe { Vec::from_raw_parts(ptr, len * 4, capacity * 4) },
+            width: self.width,
+            height: self.height,
+            channels: 4,
+        }
+    }
+
+    pub fn rgb_pixel(&self, x: DimType, y: DimType) -> [u8; 3] {
+        if self.channels == 1 {
+            let b = self.width as usize * y as usize + x as usize;
+            let b = self.data[b];
+            return [b, b, b];
+        } else if self.channels == 3 {
+            let b = (self.width as usize * y as usize + x as usize) * 3;
+            return [self.data[b], self.data[b + 1], self.data[b + 2]];
+        } else {
+            unimplemented!("not valid shape")
+        }
+    }
+
+    pub fn rgba_pixel(&self, x: DimType, y: DimType) -> [u8; 4] {
+        if self.channels == 1 {
+            let b = self.width as usize * y as usize + x as usize;
+            let b = self.data[b];
+            return [b, b, b, 255];
+        } else if self.channels == 2 {
+            let b = (self.width as usize * y as usize + x as usize) * 2;
+            let c = self.data[b];
+            let a = self.data[b + 1];
+            return [c, c, c, a];
+        } else if self.channels == 3 {
+            let b = (self.width as usize * y as usize + x as usize) * 3;
+            return [self.data[b], self.data[b + 1], self.data[b + 2], 255];
+        } else if self.channels == 4 {
+            let b = (self.width as usize * y as usize + x as usize) * 4;
+            return [
+                self.data[b],
+                self.data[b + 1],
+                self.data[b + 2],
+                self.data[b + 3],
+            ];
+        } else {
+            unimplemented!("not valid shape")
+        }
+    }
+
     pub fn _rgba(img: RgbaImage) -> (Self, Vec<u8>) {
         let v: (Vec<_>, Vec<_>) = img.pixels().map(|v| (&v.0[..3], v.0[3])).unzip();
         let data = v.0.concat();

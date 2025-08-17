@@ -6,8 +6,8 @@ use cosmic_text::{
 
 use interface_image::{DimType, Mask, RawImage};
 use opencv::{
-    core::{Mat, MatTraitConst, Point, Size, BORDER_CONSTANT},
-    imgproc::{self, dilate, morphology_default_border_value},
+    core::{Mat, MatTraitConst, Point, Size, BORDER_CONSTANT, BORDER_DEFAULT},
+    imgproc::{self, dilate, gaussian_blur, morphology_default_border_value},
 };
 use ordered_float::OrderedFloat;
 
@@ -81,8 +81,18 @@ impl ColorMap {
     }
 }
 
+fn backdrop_kernel(font_size: i32) -> opencv::Result<opencv::core::Mat> {
+    let k = (font_size as f32 / 12.0).ceil() as i32;
+    let size = 2 * k + 1;
+
+    imgproc::get_structuring_element(
+        imgproc::MORPH_ELLIPSE,
+        Size::new(size, size),
+        Point::new(-1, -1),
+    )
+}
 impl PngRenderer {
-    pub fn render(&mut self, text: TextBlock) {
+    pub fn render_block(&mut self, text: TextBlock) -> RawImage {
         let metrics = to_metrics(&text);
         let mut buffer_ = Buffer::new(&mut self.font_system, metrics);
         let mut buffer = buffer_.borrow_with(&mut self.font_system);
@@ -93,7 +103,8 @@ impl PngRenderer {
         }
         let attrs = Attrs::new();
         let mut color_map = ColorMap::default();
-
+        let font_size =
+            text.texts.iter().map(|v| v.font_size).sum::<f32>() / text.texts.len() as f32;
         let spans = text
             .texts
             .iter()
@@ -135,28 +146,30 @@ impl PngRenderer {
                     physical_glyph.cache_key,
                     glyph_color,
                     |x, y, color| {
-                        let x = (physical_glyph.x + x) as usize;
-                        let y = (run.line_y as i32 + physical_glyph.y + y) as usize;
-                        rgb[y * w + x] = [color.r(), color.g(), color.b(), 255];
-                        bg[y * w + x] = glyph.metadata as u8;
+                        let x = physical_glyph.x + x;
+                        let y = run.line_y as i32 + physical_glyph.y + y;
+                        let a = color.a();
+                        if a == 0 || x < 0 || y < 0 {
+                            return;
+                        }
+                        let x = x as usize;
+                        let y = y as usize;
+                        rgb[y * w + x] = [color.r(), color.g(), color.b(), a];
+                        if a >= 127 {
+                            bg[y * w + x] = glyph.metadata as u8;
+                        }
                     },
                 );
             }
         }
 
-        let kernel = imgproc::get_structuring_element(
-            imgproc::MORPH_ELLIPSE, // Circular shape
-            Size::new(3, 3),
-            Point::new(-1, -1),
-        )
-        .unwrap();
         let src = Mat::from_slice(&bg).unwrap();
         let src = src.reshape(1, h as i32).unwrap();
         let mut dst = Mat::default();
         dilate(
             &src,
             &mut dst,
-            &kernel,
+            &backdrop_kernel(font_size as i32).unwrap(),
             Point::new(-1, -1),
             1,
             BORDER_CONSTANT,
@@ -171,17 +184,28 @@ impl PngRenderer {
         std::mem::forget(rgb);
 
         let flat: Vec<u8> = unsafe { Vec::from_raw_parts(ptr, len, cap) };
-        RawImage {
+        let src = Mat::from_slice(&bg.data).unwrap();
+        let src = src.reshape(4, h as i32).unwrap();
+        let mut dst = Mat::default();
+        let k = (font_size as f32 / 12.0).ceil() as i32;
+        gaussian_blur(
+            &src,
+            &mut dst,
+            Size::new(2 * k + 1, 2 * k + 1),
+            0.0,
+            0.0,
+            BORDER_DEFAULT,
+            opencv::core::AlgorithmHint::ALGO_HINT_DEFAULT,
+        )
+        .unwrap();
+
+        let text = RawImage {
             width: w as DimType,
             height: h as DimType,
             data: flat,
             channels: 4,
-        }
-        .to_image()
-        .unwrap()
-        .save("text.png")
-        .unwrap();
-        bg.to_image().unwrap().save("backdrop.png").unwrap();
+        };
+        RawImage::try_from(dst).unwrap().apply(text)
     }
 }
 
@@ -239,15 +263,17 @@ impl Text {
 #[cfg(test)]
 mod tests {
     use cosmic_text::Style;
+    use env_logger::Env;
 
     use crate::png_session::{PngRenderer, Text, TextBlock};
 
     #[test]
     fn render_test() {
+        env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
         let mut renderer = PngRenderer::default();
         let block = TextBlock {
             align: cosmic_text::Align::Center,
-            default_font_size: 220.0,
+            default_font_size: 1.0,
             default_line_height: 1.2,
             vertical: false,
             size: (1000, 2000),
@@ -260,10 +286,11 @@ mod tests {
                 style: Style::Normal,
                 weight: None,
                 family: Some("Arial".to_owned()),
-                font_size: 220.0,
+                font_size: 24.0,
                 line_height: 1.2,
             }],
         };
-        renderer.render(block);
+        let img = renderer.render_block(block);
+        img.to_image().unwrap().save("text.png").unwrap();
     }
 }
