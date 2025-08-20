@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use cosmic_text::{
-    Align, Attrs, Buffer, Color, FontSystem, Metrics, Shaping, Stretch, Style, SwashCache, Weight,
+    Align, Attrs, Buffer, Color, FontSystem, LayoutRun, Metrics, Shaping, Stretch, Style,
+    SwashCache, Weight,
 };
 
 use interface_image::{DimType, Mask, RawImage};
@@ -91,8 +92,28 @@ fn backdrop_kernel(font_size: i32) -> opencv::Result<opencv::core::Mat> {
         Point::new(-1, -1),
     )
 }
+
+fn wh(layouts: &Vec<LayoutRun<'_>>) -> (usize, usize) {
+    let (h, w): (Vec<_>, Vec<_>) = layouts
+        .iter()
+        .map(|v| (v.line_top + v.line_height, v.line_w))
+        .unzip();
+    let h = h
+        .iter()
+        .map(|v| OrderedFloat(*v))
+        .max()
+        .unwrap_or_default()
+        .ceil() as usize;
+    let w = w
+        .iter()
+        .map(|v| OrderedFloat(*v))
+        .max()
+        .unwrap_or_default()
+        .ceil() as usize;
+    (w, h)
+}
 impl PngRenderer {
-    pub fn render_block(&mut self, text: TextBlock) -> RawImage {
+    fn create_buffer(&mut self, text: &TextBlock, color_map: &mut ColorMap) -> Buffer {
         let metrics = to_metrics(&text);
         let mut buffer_ = Buffer::new(&mut self.font_system, metrics);
         let mut buffer = buffer_.borrow_with(&mut self.font_system);
@@ -102,13 +123,10 @@ impl PngRenderer {
             buffer.set_size(None, Some(text.size.1 as f32))
         }
         let attrs = Attrs::new();
-        let mut color_map = ColorMap::default();
-        let font_size =
-            text.texts.iter().map(|v| v.font_size).sum::<f32>() / text.texts.len() as f32;
         let spans = text
             .texts
             .iter()
-            .map(|v| (v.text.as_str(), v.to_attr(&mut color_map)))
+            .map(|v| (v.text.as_str(), v.to_attr(color_map)))
             .collect::<Vec<_>>();
         buffer.set_rich_text(
             spans.iter().map(|(text, attrs)| (*text, attrs.clone())),
@@ -117,24 +135,17 @@ impl PngRenderer {
             Some(text.align),
         );
         buffer.shape_until_scroll(true);
-        let buffer = buffer_;
+        buffer_
+    }
+
+    pub fn render_block(&mut self, text: TextBlock) -> RawImage {
+        let font_size =
+            text.texts.iter().map(|v| v.font_size).sum::<f32>() / text.texts.len() as f32;
+        let mut color_map = ColorMap::default();
+        let buffer = self.create_buffer(&text, &mut color_map);
         let layouts = buffer.layout_runs().collect::<Vec<_>>();
-        let (h, w): (Vec<_>, Vec<_>) = layouts
-            .iter()
-            .map(|v| (v.line_top + v.line_height, v.line_w))
-            .unzip();
-        let h = h
-            .iter()
-            .map(|v| OrderedFloat(*v))
-            .max()
-            .unwrap_or_default()
-            .ceil() as usize;
-        let w = w
-            .iter()
-            .map(|v| OrderedFloat(*v))
-            .max()
-            .unwrap_or_default()
-            .ceil() as usize;
+        let (w, h) = wh(&layouts);
+
         let mut rgb = vec![[0_u8; 4]; h as usize * w as usize];
         let mut bg = vec![0_u8; h as usize * w as usize];
         for run in layouts {
@@ -207,6 +218,41 @@ impl PngRenderer {
         };
         RawImage::try_from(dst).unwrap().apply(text)
     }
+
+    pub fn max_fontsize(
+        &mut self,
+        target_size: (usize, usize),
+        mut text: TextBlock,
+        eps: f32,
+    ) -> f32 {
+        let mut measure = |size: f32| {
+            let mut color_map = ColorMap::default();
+            text.set_font_size(size);
+            let buffer = self.create_buffer(&text, &mut color_map);
+            let layouts = buffer.layout_runs().collect::<Vec<_>>();
+            wh(&layouts)
+        };
+        let mut low = 0.0;
+        let mut high = 1.0;
+        while {
+            let (w, h) = measure(high);
+            w <= target_size.0 && h <= target_size.1
+        } {
+            high *= 2.0;
+        }
+
+        while high - low > eps {
+            let mid = (low + high) / 2.0;
+            let (w, h) = measure(mid);
+            if w <= target_size.0 && h <= target_size.1 {
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+
+        low
+    }
 }
 
 pub struct TextBlock {
@@ -216,6 +262,13 @@ pub struct TextBlock {
     vertical: bool,
     size: (usize, usize),
     texts: Vec<Text>,
+}
+
+impl TextBlock {
+    fn set_font_size(&mut self, font_size: f32) {
+        self.default_font_size = font_size;
+        self.texts.iter_mut().for_each(|v| v.font_size = font_size);
+    }
 }
 
 pub struct Text {
