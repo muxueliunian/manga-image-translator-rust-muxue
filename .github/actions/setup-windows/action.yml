@@ -14,7 +14,8 @@ runs:
     - name: Upgrade LLVM
       shell: powershell
       run: choco upgrade llvm
-
+    - name: Install Dumpbin
+      uses: lorenalexm/install-dumpbin-action@main
     - name: Find OpenCV library and set environment variables
       shell: pwsh
       run: |
