@@ -14,11 +14,16 @@ runs:
     - name: Upgrade LLVM
       shell: powershell
       run: choco upgrade llvm
-    - name: Setup MSVC environment
-      uses: microsoft/setup-msbuild@v1
     - name: Find OpenCV library and set environment variables
       shell: pwsh
       run: |
+        choco install visualstudio2019buildtools --package-parameters "--includeRecommended --includeOptional --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64" --no-progress
+
+        $vsPath = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Tools\MSVC"
+        $latestVersion = (Get-ChildItem -Path $vsPath | Sort-Object Name -Descending | Select-Object -First 1).Name
+        $dumpbinPath = "$vsPath\$latestVersion\bin\Hostx64\x64"
+        echo $dumpbinPath >> $env:GITHUB_PATH
+        echo "DUMPBIN=$dumpbinPath" >> $env:GITHUB_ENV
         $files = Get-ChildItem -Path "C:\tools\opencv" -Recurse -Filter "opencv_world*.lib" |
           Where-Object { $_.Name -notmatch "d\.lib$" }
 

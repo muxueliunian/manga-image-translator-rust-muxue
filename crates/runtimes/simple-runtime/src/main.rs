@@ -40,6 +40,7 @@ async fn main() {
             Box::new(|cc| Ok(Box::new(ui::MitApp::new(cc)))),
         )
         .unwrap();
+        return;
     }
     let cli = cli::Cli::parse();
     let mut input = WalkDir::new(&cli.input)

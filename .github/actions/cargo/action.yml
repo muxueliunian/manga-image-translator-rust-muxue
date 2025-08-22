@@ -91,9 +91,6 @@ runs:
         if [ -f target/release/simple-runtime.exe ]; then
               echo "Collecting dependencies with dumpbin..."
 
-              VS_PATH="$(/c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/Installer/vswhere.exe -latest -products * -property installationPath)"
-              DUMPBIN=$(echo "$VS_PATH"/VC/Tools/MSVC/*/bin/Hostx64/x64/dumpbin.exe | head -n1)
-
               if [ ! -f "$DUMPBIN" ]; then
                 echo "❌ dumpbin not found"
                 exit 1
@@ -111,7 +108,7 @@ runs:
 
         find target/release -maxdepth 1 -type f \
                   ! -name '.*' \
-                  -name '*onnxruntime_providers*.so*' \
+                  -name '*onnxruntime_providers*.*' \
                   -exec cp -u {} artifact/ \; || true
 
     - name: Upload artifacts
