@@ -11,26 +11,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Symlink libcudnn.so to libcudnn.so.9 and export LD_LIBRARY_PATH
-      if: ${{ inputs.os == 'linux' }}
-      shell: bash
-      run: |
-        libfile=$(find target/release -type f -name 'libcudnn.so' | head -n1)
-
-        if [ -n "$libfile" ]; then
-          echo "Found libcudnn at $libfile"
-
-          # Use /usr/local/lib since it's already in the default library search path
-          sudo mkdir -p /usr/local/lib
-
-          sudo ln -sf "$libfile" /usr/local/lib/libcudnn.so.9
-          sudo ldconfig   # refresh the dynamic linker cache
-
-          echo "✅ Linked libcudnn globally: /usr/local/lib/libcudnn.so.9"
-        else
-          echo "❌ libcudnn.so not found in target/release"
-          exit 1
-        fi
     - name: Build with maturin
       run: |
         cd crates/py-bindings
