@@ -38,7 +38,7 @@ runs:
         cargo build --release -p simple-runtime
 
     - name: Symlink libcudnn.so to libcudnn.so.9 and export LD_LIBRARY_PATH
-      if: ${{ inputs.os == 'linux' }}
+      if: ${{ inputs.runs-on == 'linux-x86_64' }}
       shell: bash
       run: |
         libfile=$(find target/release -type f -name 'libcudnn.so' | head -n1)
