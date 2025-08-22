@@ -48,7 +48,7 @@ runs:
 
           # Use /usr/local/lib since it's already in the default library search path
           sudo mkdir -p /usr/local/lib
-
+          sudo ln -sf "$libfile" /usr/local/lib/libcudnn.so
           sudo ln -sf "$libfile" /usr/local/lib/libcudnn.so.9
           sudo ldconfig   # refresh the dynamic linker cache
 
@@ -73,7 +73,11 @@ runs:
                 | awk '{print $3}' \
                 | grep '^/' \
                 | while read -r lib; do
-                    cp -u "$lib" artifact/ || true
+                    if [ -f "$lib" ]; then
+                        cp -u "$lib" artifact/
+                    else
+                        echo "⚠️ File not found: $lib"
+                    fi
                   done
               ;;
             macos)
@@ -82,29 +86,38 @@ runs:
                 | awk 'NR>1 {print $1}' \
                 | grep '^/' \
                 | while read -r lib; do
-                    cp -u "$lib" artifact/ || true
+                    if [ -f "$lib" ]; then
+                        cp -u "$lib" artifact/
+                    else
+                        echo "⚠️ File not found: $lib"
+                    fi
                   done
               ;;
           esac
         fi
 
         if [ -f target/release/simple-runtime.exe ]; then
-              echo "Collecting dependencies with dumpbin..."
+            echo "Collecting dependencies with dumpbin..."
 
-              if [ ! -f "$DUMPBIN" ]; then
+            if [ ! -f "$DUMPBIN" ]; then
                 echo "❌ dumpbin not found"
                 exit 1
-              fi
+            fi
 
-              "$DUMPBIN" //DEPENDENTS target/release/simple-runtime.exe \
+            "$DUMPBIN" //DEPENDENTS target/release/simple-runtime.exe \
                 | grep '\.dll' \
                 | tr -d '\r' \
                 | while read -r dll; do
                     found=$(which "$dll" 2>/dev/null || true)
                     [ -z "$found" ] && found="$(find /c/Windows/System32 -iname "$dll" 2>/dev/null | head -n1)"
-                    [ -n "$found" ] && cp -u "$found" artifact/ || true
-                  done
-            fi
+
+                    if [ -n "$found" ]; then
+                        cp -u "$found" artifact/ || true
+                    else
+                        echo "⚠️ DLL not found: $dll"
+                    fi
+                done
+        fi
 
         find target/release -maxdepth 1 -type f \
                   ! -name '.*' \

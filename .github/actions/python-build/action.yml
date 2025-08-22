@@ -29,6 +29,7 @@ runs:
       run: |
         pip install wheel delocate
         mkdir -p target/wheels/fixed
+        export DYLD_LIBRARY_PATH=/home/runner/work/manga-image-translator-rust/manga-image-translator-rust/target/release/ctranslate2-vendor/dyn/:$DYLD_LIBRARY_PATH
         for whl in target/wheels/rusty_manga_image_translator-*.whl; do
         delocate-wheel -w target/wheels/fixed/ "$whl"
         done
