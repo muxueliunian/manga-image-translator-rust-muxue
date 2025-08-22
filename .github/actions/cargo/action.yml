@@ -8,6 +8,8 @@ inputs:
     required: true
   test:
     required: true
+  os:
+    required: true
   runs-on:
     required: true
 
@@ -34,12 +36,56 @@ runs:
       shell: bash
       run: |
         cargo build --release -p simple-runtime
+
+    - name: Prepare artifacts
+      shell: bash
+      run: |
+        mkdir -p artifact
+
+        cp target/release/simple-runtime artifact/ 2>/dev/null || true
+        cp target/release/simple-runtime.exe artifact/ 2>/dev/null || true
+
+        if [ -f target/release/simple-runtime ]; then
+          case "${{ inputs.os }}" in
+            linux)
+              echo "Collecting dependencies with ldd..."
+              ldd target/release/simple-runtime \
+                | awk '{print $3}' \
+                | grep '^/' \
+                | while read -r lib; do
+                    cp -u "$lib" artifact/ || true
+                  done
+              ;;
+            macos)
+              echo "Collecting dependencies with otool..."
+              otool -L target/release/simple-runtime \
+                | awk 'NR>1 {print $1}' \
+                | grep '^/' \
+                | while read -r lib; do
+                    cp -u "$lib" artifact/ || true
+                  done
+              ;;
+          esac
+        fi
+
+        if [ -f target/release/simple-runtime.exe ]; then
+          echo "Collecting dependencies with dumpbin..."
+          dumpbin //DEPENDENTS target/release/simple-runtime.exe \
+            | grep '\.dll' \
+            | while read -r dll; do
+                found=$(which "$dll" 2>/dev/null || true)
+                [ -z "$found" ] && found="$(find /c/Windows/System32 -iname "$dll" 2>/dev/null | head -n1)"
+                [ -n "$found" ] && cp -u "$found" artifact/ || true
+              done
+        fi
+
+        find target/release -maxdepth 1 -type f -name 'onnxruntime_providers_*.*' \
+          -exec cp {} artifact/ \;
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: -${{ inputs.name }}
-        path: |
-          target/release/simple-runtime
-          target/release/simple-runtime.exe
+        name: ${{ inputs.name }}
+        path: artifact
         retention-days: 5
-        if-no-files-found: ignore
+        if-no-files-found: error

@@ -72,6 +72,7 @@ jobs:
         with:
           test: true
           runs-on: ${{ matrix.platform.runs-on }}
+          os: ${{  matrix.platform.os }}
           name: ${{ matrix.platform.name }}
 
       - name: Build wheels
@@ -99,14 +100,45 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
-      - name: Prepare Release Files
+      - name: Prepare Release Archives
+        shell: bash
         run: |
-          mkdir release
-          cp -- "-linux-x86_64/simple-runtime" release/manga-image-translator-linux-x86_64
-          cp -- "-windows-x86_64/simple-runtime.exe" release/manga-image-translator-windows-x86_64.exe
-          cp -- "-macos-x86_64/simple-runtime" release/manga-image-translator-macos-x86_64
-          cp -- "-linux-arm64/simple-runtime" release/manga-image-translator-linux-arm64
-          cp -- "-macos-arm64/simple-runtime" release/manga-image-translator-macos-arm64
+          mkdir -p release
+
+          # Define architectures and OSes
+          declare -A bins=(
+            ["linux-x86_64"]="-linux-x86_64/simple-runtime"
+            ["linux-arm64"]="-linux-arm64/simple-runtime"
+            ["windows-x86_64"]="-windows-x86_64/simple-runtime.exe"
+            ["macos-x86_64"]="-macos-x86_64/simple-runtime"
+            ["macos-arm64"]="-macos-arm64/simple-runtime"
+          )
+
+          for target in "${!bins[@]}"; do
+            bin_path="${bins[$target]}"
+            release_dir="release/manga-image-translator-$target"
+            mkdir -p "$release_dir"
+
+            # Copy main binary
+            cp -- "$bin_path" "$release_dir/$(basename "$bin_path")"
+
+            # Copy dependencies from artifact folder
+            if [ -d artifact ]; then
+              cp -u artifact/* "$release_dir/" || true
+            fi
+
+            # Create tar.gz for Linux/macOS, zip for Windows
+            case "$target" in
+              windows-*)
+                pushd release
+                zip -r "manga-image-translator-$target.zip" "manga-image-translator-$target"
+                popd
+                ;;
+              *)
+                tar -czf "release/manga-image-translator-$target.tar.gz" -C release "manga-image-translator-$target"
+                ;;
+            esac
+          done
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
