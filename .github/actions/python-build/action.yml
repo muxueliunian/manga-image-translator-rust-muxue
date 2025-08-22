@@ -20,6 +20,7 @@ runs:
         if [ -n "$libpath" ]; then
           ln -sf "$libpath/libcudnn.so" "$libpath/libcudnn.so.9"
           echo "Found and linked libcudnn.so -> libcudnn.so.9 in $libpath"
+          echo "LIBRARY_PATH=$libpath:$LIBRARY_PATH" >> $GITHUB_ENV
           echo "LD_LIBRARY_PATH=$libpath:$LD_LIBRARY_PATH" >> $GITHUB_ENV
         else
           echo "❌ libcudnn.so not found in target/release"
