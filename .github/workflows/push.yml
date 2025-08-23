@@ -24,14 +24,14 @@ jobs:
     runs-on: ${{ matrix.platform.runs-on }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Setup Linux
         if: matrix.platform.name == 'linux-x86_64'
         uses: ./.github/actions/setup-linux
         with:
           runs-on: ${{ matrix.platform.runs-on }}
+
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Setup macOS
         if: matrix.platform.name == 'macos-arm64'
