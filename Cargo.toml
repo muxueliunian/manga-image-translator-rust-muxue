@@ -89,6 +89,7 @@ regex = "1.11.1"
 cosmic-text = "0.14.2"
 uni-ocr = "0.1.5"
 async-trait = "0.1.89"
+pyo3 = "0.25.1"
 
 [patch.crates-io]
 clipper2c-sys = { git = "https://github.com/tirithen/clipper2c-sys" }

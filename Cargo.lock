@@ -1584,6 +1584,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctc-48px"
+version = "0.8.12"
+
+[[package]]
 name = "ctd"
 version = "0.8.12"
 dependencies = [
@@ -4713,6 +4717,20 @@ dependencies = [
  "uuid",
  "walkdir",
 ]
+
+[[package]]
+name = "ocr-32px"
+version = "0.8.12"
+dependencies = [
+ "interface-image",
+ "ndarray",
+ "numpy",
+ "pyo3",
+]
+
+[[package]]
+name = "ocr-48px"
+version = "0.8.12"
 
 [[package]]
 name = "once_cell"
