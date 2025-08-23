@@ -205,5 +205,6 @@ runs:
         EOF
 
     - name: Inject DLL into wheel
+      if: ${{ inputs.os != 'macos' }}
       shell: bash
       run: python inject_dll.py
