@@ -10,7 +10,6 @@ runs:
     - name: Maximize build space
       uses: easimon/maximize-build-space@master
       with:
-        swap-size-mb: 1024
         remove-dotnet: "true"
         remove-android: "true"
         remove-codeql: "true"
@@ -19,5 +18,7 @@ runs:
     - name: Install dependencies
       shell: bash
       run: |
+        echo "Free space:"
+        df -h
         sudo apt-get update
         sudo apt-get install -y pkg-config libssl-dev libopencv-dev clang libclang-dev libfontconfig-dev
