@@ -792,7 +792,7 @@ dependencies = [
 [[package]]
 name = "base-util"
 version = "0.8.12"
-source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#3dd1761c81f70e190f0495349aef925e007ea926"
+source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#7b0c7dec2bc60bf16c9a89d83040be2a775583eb"
 dependencies = [
  "anyhow",
  "ndarray",
@@ -1571,7 +1571,7 @@ dependencies = [
 [[package]]
 name = "ct2rs"
 version = "0.9.7"
-source = "git+https://github.com/frederik-uni/ctranslate2-rs?branch=use-with-dynamic-linking#63869631f0e5206d8cec4bdf25432edef9ea332b"
+source = "git+https://github.com/frederik-uni/ctranslate2-rs?branch=use-with-dynamic-linking#8a0acb31d9e48905209f915e6b8b3ab7562fb74a"
 dependencies = [
  "anyhow",
  "cmake",
@@ -3340,9 +3340,9 @@ checksum = "d0263a3d970d5c054ed9312c0057b4f3bde9c0b33836d3637361d4a9e6e7a408"
 
 [[package]]
 name = "indexmap"
-version = "2.10.0"
+version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe4cd85333e22411419a0bcae1297d25e58c9443848b11dc6a86fefe8c78a661"
+checksum = "f2481980430f9f78649238835720ddccc57e52df14ffce1c6f37391d61b563e9"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.5",
@@ -3447,7 +3447,7 @@ dependencies = [
 [[package]]
 name = "interface-model"
 version = "0.8.12"
-source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#3dd1761c81f70e190f0495349aef925e007ea926"
+source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#7b0c7dec2bc60bf16c9a89d83040be2a775583eb"
 dependencies = [
  "base-util 0.8.12 (git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master)",
  "flate2",

@@ -34,6 +34,7 @@ runs:
       run: |
         pip install wheel delocate
         mkdir -p target/wheels/fixed
+        ls /home/runner/work/manga-image-translator-rust/manga-image-translator-rust/target/release/
         export DYLD_LIBRARY_PATH=/home/runner/work/manga-image-translator-rust/manga-image-translator-rust/target/release/ctranslate2-vendor/dyn/:$DYLD_LIBRARY_PATH
         for whl in target/wheels/rusty_manga_image_translator-*.whl; do
         delocate-wheel -w target/wheels/fixed/ "$whl"
@@ -59,7 +60,6 @@ runs:
         import os
         import subprocess
         import tempfile
-
 
         def find_dlls() -> list[Path]:
             base_dir = Path("target/release")
@@ -95,14 +95,17 @@ runs:
             return None
 
         def find_dll_on_path(dll_name: str) -> Optional[Path]:
-            target_dir = Path("target") / "release"
+            target_dirs = [Path("target") / "release", Path("C:/tools/opencv")]
+
             for dir in os.environ['PATH'].split(os.pathsep):
                 candidate = Path(dir) / dll_name
                 if candidate.exists():
                     return candidate.resolve()
 
-            for file in target_dir.rglob(dll_name):
-                if file.is_file():
+            for base in target_dirs:
+              if base.exists():
+                for file in base.rglob(dll_name):
+                  if file.is_file():
                     return file.resolve()
 
             return None
