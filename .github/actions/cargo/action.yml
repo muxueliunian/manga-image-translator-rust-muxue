@@ -35,7 +35,7 @@ runs:
       if: inputs.runs-on != 'macos-latest' && inputs.runs-on != 'macos-13'
       shell: bash
       run: |
-        cargo build --release -p simple-runtime
+        cargo build --release -p simple-runtime -vv
 
     - name: Symlink libcudnn.so to libcudnn.so.9 and export LD_LIBRARY_PATH
       if: ${{ inputs.runs-on == 'linux-x86_64' }}
