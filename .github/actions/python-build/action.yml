@@ -47,6 +47,7 @@ runs:
         mv target/wheels/fixed/*.whl target/wheels/
         rmdir target/wheels/fixed
     - name: Write inject_dll.py script
+      if: ${{ inputs.os != 'macos' }}
       shell: bash
       run: |
         cat > inject_dll.py << 'EOF'
