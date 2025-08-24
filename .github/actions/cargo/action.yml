@@ -154,7 +154,6 @@ runs:
       env:
         RUNNER_OS: ${{ inputs.os }}
       run: |
-        $RUNNER_OS=inputs.os
         case "$RUNNER_OS" in
           windows)
             pattern="onnxruntime_providers_*.dll"
