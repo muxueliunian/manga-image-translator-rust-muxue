@@ -122,6 +122,7 @@ runs:
                     dll_paths.append(dll_path)
                 else:
                     print(f"DLL not found in PATH: {dll_name}")
+            print(f"Found DLLs: {dll_paths}")
             return dll_paths
 
         def wheel_paths() -> list[Path]:
@@ -162,11 +163,7 @@ runs:
             # === Set up target path inside wheel ===
             package_root_subdir = "rusty_manga_image_translator"
             dll_list = find_dlls()
-            if sys.platform.startswith("linux"):
-              targets_inside_wheel = [(f"{package_root_subdir}.libs/{path.name}", path, generate_info(path)) for path in dll_list]
-            else:
-              targets_inside_wheel = [(f"{package_root_subdir}/{path.name}", path, generate_info(path)) for path in dll_list]
-
+           
             tmp_wheel_path = wheel_path.with_name(wheel_path.stem + "_tmp.whl")
 
             with WheelFile(wheel_path, 'r') as original_wheel:
@@ -181,6 +178,11 @@ runs:
                         if binary_path is None:
                           raise FileNotFoundError("Could not find the binary inside the wheel")
                         dll_list.extend(find_windows_dll(binary_path))
+                    if sys.platform.startswith("linux"):
+                      targets_inside_wheel = [(f"{package_root_subdir}.libs/{path.name}", path, generate_info(path)) for path in dll_list]
+                    else:
+                      targets_inside_wheel = [(f"{package_root_subdir}/{path.name}", path, generate_info(path)) for path in dll_list]
+
                     rewrite(original_wheel, new_wheel, targets_inside_wheel, record_name)
                     if record_name:
                         record_content = original_wheel.read(record_name).decode('utf-8')
