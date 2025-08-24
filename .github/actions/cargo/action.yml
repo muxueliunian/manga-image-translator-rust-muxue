@@ -62,7 +62,6 @@ runs:
     - name: Log files
       shell: bash
       run: |
-        sleep 1
         ls target/release
     - name: Prepare artifacts
       shell: bash
