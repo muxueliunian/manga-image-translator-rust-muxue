@@ -8,7 +8,7 @@ runs:
   using: "composite"
   steps:
     - name: Maximize build space
-      if: ${{ inputs.runs-on == 'ubuntu-latest' }}
+      if: ${{ inputs.runs-on == 'ubuntu-22.04' }}
       uses: easimon/maximize-build-space@master
       with:
         root-reserve-mb: 16384

@@ -91,7 +91,7 @@ runs:
               otool -L target/release/simple-runtime \
                 | awk 'NR>1 {print $1}' \
                 | grep '^/' \
-                | grep -vE '^(/usr/lib|/System/Library)' \
+                | grep -vE '^(/usr/lib|/System/Library/Frameworks)' \
                 | while read -r lib; do
                     if [ -f "$lib" ]; then
                         cp -n "$lib" artifact/
@@ -110,13 +110,17 @@ runs:
                 echo "❌ dumpbin not found"
                 exit 1
             fi
-
             "$DUMPBIN" //DEPENDENTS target/release/simple-runtime.exe \
                 | grep '\.dll' \
                 | tr -d '\r' \
                 | while read -r dll; do
-                    found=$(which "$dll" 2>/dev/null || true)
+                    found="$(find target/release -maxdepth 1 -iname "$dll" 2>/dev/null || true)"
+
+                    [ -z "$found" ] && found="$(which "$dll" 2>/dev/null || true)"
+
                     [ -z "$found" ] && found="$(find /c/Windows/System32 -iname "$dll" 2>/dev/null | head -n1)"
+
+                    [ -z "$found" ] && found="$(find /c/tools/opencv -iname "$dll" 2>/dev/null | head -n1)"
 
                     if [ -n "$found" ]; then
                         cp -u "$found" artifact/ || true

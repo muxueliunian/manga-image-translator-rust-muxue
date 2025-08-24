@@ -114,9 +114,22 @@ runs:
             import pefile
             pe = pefile.PE(str(binary_path))
             dll_paths = []
+            SYSTEM_DLLS = {
+                "kernel32.dll", "ntdll.dll", "advapi32.dll", "bcrypt.dll", "bcryptprimitives.dll",
+                "dbghelp.dll", "directml.dll", "DXCore.dll", "D3D12.dll", "dxgi.dll", "setupapi.dll",
+                "ws2_32.dll"
+            }
+
+            SYSTEM_PREFIXES = [
+                "vcruntime","msvcp",
+                "api-ms-",  # Windows API sets
+            ]
 
             for entry in pe.DIRECTORY_ENTRY_IMPORT:
+
                 dll_name = entry.dll.decode('utf-8').strip()
+                if dll_name in SYSTEM_DLLS or any(dll_name.startswith(p) for p in SYSTEM_PREFIXES):
+                    continue
                 dll_path = find_dll_on_path(dll_name)
                 if dll_path:
                     dll_paths.append(dll_path)
@@ -163,7 +176,7 @@ runs:
             # === Set up target path inside wheel ===
             package_root_subdir = "rusty_manga_image_translator"
             dll_list = find_dlls()
-           
+
             tmp_wheel_path = wheel_path.with_name(wheel_path.stem + "_tmp.whl")
 
             with WheelFile(wheel_path, 'r') as original_wheel:
