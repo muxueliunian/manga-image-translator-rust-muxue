@@ -203,6 +203,7 @@ impl TextBlock {
             prob,
             fg_color,
             bg_color,
+            translations: Default::default(),
             skip_translate: false,
         }
     }

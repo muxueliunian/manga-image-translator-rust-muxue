@@ -86,7 +86,7 @@ async fn main() {
             warn!("File {} cant be found", path.display());
             continue;
         }
-        let img = match image::open(path) {
+        let img = match image::open(&path) {
             Ok(img) => img,
             Err(err) => {
                 error!("Failed to open image {}: {}", path.display(), err);
