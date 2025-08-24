@@ -792,7 +792,7 @@ dependencies = [
 [[package]]
 name = "base-util"
 version = "0.8.12"
-source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#8608b1ee9ca4f1323c4d2d2737cc53bc4dc0c12e"
+source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#22a810ca0f8c3e20227b29a8afa7e9ba36005d47"
 dependencies = [
  "anyhow",
  "ndarray",
@@ -3451,7 +3451,7 @@ dependencies = [
 [[package]]
 name = "interface-model"
 version = "0.8.12"
-source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#8608b1ee9ca4f1323c4d2d2737cc53bc4dc0c12e"
+source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#22a810ca0f8c3e20227b29a8afa7e9ba36005d47"
 dependencies = [
  "base-util 0.8.12 (git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master)",
  "flate2",
