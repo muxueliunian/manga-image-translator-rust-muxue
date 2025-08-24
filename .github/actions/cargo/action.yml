@@ -75,28 +75,43 @@ runs:
           case "${{ inputs.os }}" in
             linux)
               echo "Collecting dependencies with ldd..."
-              ldd target/release/simple-runtime \
-                | awk '{print $3}' \
-                | while read -r lib; do
-                    if [ -f "$lib" ]; then
-                        cp -u "$lib" artifact/
-                    else
-                        echo "⚠️ File not found: $lib"
-                    fi
+              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(pwd)/target/release"
+              copy_deps() {
+                  local file="$1"
+                  ldd "$file" | awk '{print $3}' | while read -r lib; do
+                      if [ -n "$lib" ] && [ -f "$lib" ]; then
+                          if [ ! -f "artifact/$(basename "$lib")" ]; then
+                              cp -u "$lib" artifact/
+                              copy_deps "$lib"   # recurse into this lib
+                          fi
+                      else
+                          echo "⚠️ File not found: $lib"
+                      fi
                   done
+              }
+              copy_deps target/release/simple-runtime
               ;;
             macos)
               echo "Collecting dependencies with otool..."
-              otool -L target/release/simple-runtime \
-                | awk 'NR>1 {print $1}' \
-                | grep -vE '^(/usr/lib|/System/Library/Frameworks)' \
-                | while read -r lib; do
-                    if [ -f "$lib" ]; then
-                        cp -n "$lib" artifact/
-                    else
-                        echo "⚠️ File not found: $lib"
-                    fi
-                  done
+              export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$(pwd)/target/release"
+              copy_deps_mac() {
+                  local file="$1"
+                  otool -L "$file" | awk 'NR>1 {print $1}' \
+                      | grep -vE '^(/usr/lib|/System/Library/Frameworks)' \
+                      | grep -v '^$' \
+                      | while read -r lib; do
+                          if [ -f "$lib" ]; then
+                              if [ ! -f "artifact/$(basename "$lib")" ]; then
+                                  cp -n "$lib" artifact/
+                                  copy_deps_mac "$lib"  # recurse into this lib
+                              fi
+                          else
+                              echo "⚠️ File not found: $lib"
+                          fi
+                      done
+              }
+
+              copy_deps_mac target/release/simple-runtime
               ;;
           esac
         fi
