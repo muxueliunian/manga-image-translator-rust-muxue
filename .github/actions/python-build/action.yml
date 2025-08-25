@@ -218,7 +218,7 @@ runs:
                             lines.append(record_line.strip())
 
                         new_record_content = '\n'.join(lines) + '\n'
-                        new_wheel.writestr(record_name, new_record_content)
+                        # new_wheel.writestr(record_name, new_record_content)
                     else:
                         raise ValueError("RECORD file not found")
             tmp_wheel_path.replace(wheel_path)
