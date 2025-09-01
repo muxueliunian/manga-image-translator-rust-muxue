@@ -162,12 +162,16 @@ runs:
             pattern="libonnxruntime_providers_*.dylib"
             ;;
           linux)
+            cp -u -L target/release/libcudnn.so.9 artifact/
             pattern="libonnxruntime_providers_*.so"
             ;;
         esac
 
         ls target/release
-        find target/release -type f -name "$pattern" -exec cp {} artifact/ \; || true
+        find target/release \
+          -regextype posix-extended \
+          -regex ".*onnxruntime_providers_.*\.(dll|so)" \
+          -exec cp -L {} artifact/ \; || true
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
