@@ -7,7 +7,10 @@ use base_util::{
 };
 use geo::{MinimumRotatedRect, Point};
 
-use interface_detector::{textlines::Quadrilateral, DefaultOptions, Detector};
+use interface_detector::{
+    textlines::{MyPoint, Quadrilateral},
+    DefaultOptions, Detector,
+};
 use interface_image::{ImageOp, Mask, RawImage};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use maplit::hashmap;
@@ -192,7 +195,7 @@ impl Detector for PaddleDetector {
     }
 }
 
-pub fn fill_polys_mask(pts: Vec<&[(i64, i64); 4]>, width: usize, height: usize) -> Vec<u8> {
+pub fn fill_polys_mask(pts: Vec<&[MyPoint; 4]>, width: usize, height: usize) -> Vec<u8> {
     let mut mask = vec![0u8; width * height];
 
     for quad in pts {
@@ -201,21 +204,21 @@ pub fn fill_polys_mask(pts: Vec<&[(i64, i64); 4]>, width: usize, height: usize) 
 
     mask
 }
-fn fill_polygon(mask: &mut [u8], width: usize, height: usize, poly: &[(i64, i64); 4]) {
+fn fill_polygon(mask: &mut [u8], width: usize, height: usize, poly: &[MyPoint; 4]) {
     let mut edges = Vec::new();
 
     for i in 0..4 {
-        let (x0, y0) = poly[i];
-        let (x1, y1) = poly[(i + 1) % 4];
-        if y0 != y1 {
-            edges.push(((x0, y0), (x1, y1)));
+        let point = poly[i];
+        let point2 = poly[(i + 1) % 4];
+        if point.y != point2.y {
+            edges.push(((point.x, point.y), (point2.x, point2.y)));
         }
     }
 
-    let min_y = poly.iter().map(|&(_, y)| y).min().unwrap().max(0) as usize;
+    let min_y = poly.iter().map(|point| point.y).min().unwrap().max(0) as usize;
     let max_y = poly
         .iter()
-        .map(|&(_, y)| y)
+        .map(|point| point.y)
         .max()
         .unwrap()
         .min(height as i64 - 1) as usize;

@@ -5,6 +5,7 @@ use interface_detector::textlines::Quadrilateral;
 use interface_image::{ImageOp, Mask, RawImage};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad};
 use interface_ocr::{Ocr, QuadrilateralInfo};
+use parking_lot::Mutex;
 use tokio::task::spawn_blocking;
 use uni_ocr::{Language, OcrEngine, OcrOptions, OcrProvider};
 
@@ -57,7 +58,7 @@ impl Ocr for TesseractOCR {
     async fn detect(
         &mut self,
         image: &Arc<RawImage>,
-        areas: &[Quadrilateral],
+        areas: &[Arc<Mutex<Quadrilateral>>],
         img_processor: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<Vec<interface_ocr::QuadrilateralInfo>> {
         let mut texts = vec![];
@@ -74,7 +75,7 @@ impl Ocr for TesseractOCR {
         .await?;
 
         for area in areas {
-            let bbox = area.aabb();
+            let bbox = area.lock().aabb();
             let grayscale = grayscale.clone();
             let img = spawn_blocking(move || {
                 let view =
@@ -92,7 +93,7 @@ impl Ocr for TesseractOCR {
     async fn detect_patch(
         &mut self,
         sliced_image: interface_image::Mask,
-        area: interface_detector::textlines::Quadrilateral,
+        area: Arc<Mutex<interface_detector::textlines::Quadrilateral>>,
         _: &Arc<dyn interface_image::ImageOp + Send + Sync>,
     ) -> anyhow::Result<interface_ocr::QuadrilateralInfo> {
         let model = self.load()?;
@@ -100,12 +101,13 @@ impl Ocr for TesseractOCR {
             spawn_blocking(move || image::DynamicImage::from(sliced_image.to_image().unwrap()))
                 .await?;
 
-        let (result, _, _) = model.recognize_image(&image).await?;
+        let (result, _, prob) = model.recognize_image(&image).await?;
         Ok(QuadrilateralInfo {
             text: result,
             fg: None,
             bg: None,
             pos: area,
+            prob: prob.unwrap_or(1.0),
         })
     }
 }
@@ -117,6 +119,7 @@ mod tests {
     use interface_detector::textlines::Quadrilateral;
     use interface_image::{CpuImageProcessor, ImageOp, RawImage};
     use interface_ocr::Ocr as _;
+    use parking_lot::Mutex;
 
     use crate::TesseractOCR;
 
@@ -126,8 +129,14 @@ mod tests {
             .expect("Failed to load image");
         let mut mocr = TesseractOCR::default();
         let inp = vec![
-            Quadrilateral::new(vec![(208, 4), (246, 4), (246, 192), (208, 192)], 1.0),
-            Quadrilateral::new(vec![(76, 1788), (128, 1788), (128, 1930), (76, 1930)], 1.0),
+            Arc::new(Mutex::new(Quadrilateral::new(
+                vec![(208, 4), (246, 4), (246, 192), (208, 192)],
+                1.0,
+            ))),
+            Arc::new(Mutex::new(Quadrilateral::new(
+                vec![(76, 1788), (128, 1788), (128, 1930), (76, 1930)],
+                1.0,
+            ))),
         ];
         let ip = Arc::new(CpuImageProcessor::default()) as Arc<dyn ImageOp + Send + Sync>;
         let v = mocr.detect(&Arc::new(img), &inp, &ip).await.unwrap();

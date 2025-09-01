@@ -5,6 +5,7 @@ use cosmic_text::{
     SwashCache, Weight,
 };
 
+use export::Export;
 use interface_image::{DimType, Mask, RawImage};
 use opencv::{
     core::{Mat, MatTraitConst, Point, Size, BORDER_CONSTANT, BORDER_DEFAULT},
@@ -17,6 +18,72 @@ pub struct PngRenderer {
     cache: SwashCache,
 }
 
+pub struct PngRenderConfig {
+    pub min_fontsize: f32,
+    pub max_fontsize: f32,
+    pub detect_offset: f32,
+    pub fg_color: Option<(u8, u8, u8)>,
+    pub bg_color: Option<(u8, u8, u8)>,
+    pub align: MyAlign,
+    pub letter_spacing: Option<f32>,
+    pub font_size: f32,
+    pub line_height: f32,
+    pub family: Option<String>,
+}
+pub enum MyAlign {
+    Left,
+    Center,
+    Right,
+}
+
+impl PngRenderer {
+    pub fn render(&mut self, exp: Export, config: PngRenderConfig) -> RawImage {
+        let mut img = exp.get_image();
+        for patch in exp.patches {
+            let patch_img = patch.get_image();
+            let (x, y) = patch.pos;
+            img.apply_patch(&patch_img, x as u16, y as u16);
+            let text = patch.info;
+            let obb = text.obb().unwrap();
+            let mut render_block = RenderTextBlock {
+                align: match config.align {
+                    MyAlign::Left => Align::Left,
+                    MyAlign::Center => Align::Center,
+                    MyAlign::Right => Align::Right,
+                },
+                default_font_size: config.font_size,
+                default_line_height: config.line_height,
+                vertical: false,
+                size: (obb.w as usize, obb.h as usize),
+                texts: vec![Text {
+                    text: text.text,
+                    letter_spacing: config.letter_spacing,
+                    color: config.fg_color.or(text.fg_color),
+                    bg_color: config.bg_color.or(text.bg_color),
+                    font_size: config.font_size,
+                    line_height: config.line_height,
+                    family: config.family.clone(),
+                    weight: None,
+                    style: Style::Normal,
+                    stretch: None,
+                }],
+            };
+
+            let font_size = self
+                .max_fontsize((obb.w as usize, obb.h as usize), render_block.clone(), 1.0)
+                .clamp(
+                    text.font_size as f32 - config.detect_offset,
+                    text.font_size as f32 + config.detect_offset,
+                )
+                .clamp(config.min_fontsize, config.max_fontsize)
+                .round() as u32;
+            render_block.set_font_size(font_size as f32);
+            let img = self.render_block(render_block);
+        }
+        img
+    }
+}
+
 impl Default for PngRenderer {
     fn default() -> Self {
         Self {
@@ -26,7 +93,7 @@ impl Default for PngRenderer {
     }
 }
 
-fn to_metrics(input: &TextBlock) -> Metrics {
+fn to_metrics(input: &RenderTextBlock) -> Metrics {
     Metrics::new(
         input.default_font_size,
         input.default_font_size * input.default_line_height,
@@ -36,12 +103,12 @@ fn to_metrics(input: &TextBlock) -> Metrics {
 #[derive(Default)]
 pub struct ColorMap {
     index: usize,
-    map: HashMap<[u8; 3], usize>,
-    map2: HashMap<usize, [u8; 3]>,
+    map: HashMap<(u8, u8, u8), usize>,
+    map2: HashMap<usize, (u8, u8, u8)>,
 }
 
 impl ColorMap {
-    pub fn get_id(&mut self, color: [u8; 3]) -> usize {
+    pub fn get_id(&mut self, color: (u8, u8, u8)) -> usize {
         if let Some(i) = self.map.get(&color) {
             return *i;
         }
@@ -62,7 +129,7 @@ impl ColorMap {
         for id in input.data {
             let get = self.map2.get(&(id as usize));
             data.push(match get {
-                Some(s) => [s[0], s[1], s[2], 255],
+                Some(s) => [s.0, s.1, s.2, 255],
                 None => [0, 0, 0, 0],
             });
         }
@@ -113,7 +180,7 @@ fn wh(layouts: &Vec<LayoutRun<'_>>) -> (usize, usize) {
     (w, h)
 }
 impl PngRenderer {
-    fn create_buffer(&mut self, text: &TextBlock, color_map: &mut ColorMap) -> Buffer {
+    fn create_buffer(&mut self, text: &RenderTextBlock, color_map: &mut ColorMap) -> Buffer {
         let metrics = to_metrics(&text);
         let mut buffer_ = Buffer::new(&mut self.font_system, metrics);
         let mut buffer = buffer_.borrow_with(&mut self.font_system);
@@ -138,7 +205,7 @@ impl PngRenderer {
         buffer_
     }
 
-    pub fn render_block(&mut self, text: TextBlock) -> RawImage {
+    pub fn render_block(&mut self, text: RenderTextBlock) -> RawImage {
         let font_size =
             text.texts.iter().map(|v| v.font_size).sum::<f32>() / text.texts.len() as f32;
         let mut color_map = ColorMap::default();
@@ -222,7 +289,7 @@ impl PngRenderer {
     pub fn max_fontsize(
         &mut self,
         target_size: (usize, usize),
-        mut text: TextBlock,
+        mut text: RenderTextBlock,
         eps: f32,
     ) -> f32 {
         let mut measure = |size: f32| {
@@ -255,7 +322,8 @@ impl PngRenderer {
     }
 }
 
-pub struct TextBlock {
+#[derive(Clone)]
+pub struct RenderTextBlock {
     align: Align,
     default_font_size: f32,
     default_line_height: f32,
@@ -264,18 +332,19 @@ pub struct TextBlock {
     texts: Vec<Text>,
 }
 
-impl TextBlock {
+impl RenderTextBlock {
     fn set_font_size(&mut self, font_size: f32) {
         self.default_font_size = font_size;
         self.texts.iter_mut().for_each(|v| v.font_size = font_size);
     }
 }
 
+#[derive(Clone)]
 pub struct Text {
     text: String,
     letter_spacing: Option<f32>,
     color: Option<(u8, u8, u8)>,
-    bg_color: Option<[u8; 3]>,
+    bg_color: Option<(u8, u8, u8)>,
     stretch: Option<Stretch>,
     style: Style,
     weight: Option<Weight>,
@@ -295,7 +364,7 @@ impl Text {
                 self.font_size,
                 self.font_size * self.line_height,
             ))
-            .metadata(color_map.get_id(self.bg_color.unwrap_or([255; 3])));
+            .metadata(color_map.get_id(self.bg_color.unwrap_or((255, 255, 255))));
         if let Some(letter_spacing) = self.letter_spacing {
             attrs = attrs.letter_spacing(letter_spacing)
         }
@@ -318,13 +387,13 @@ mod tests {
     use cosmic_text::Style;
     use env_logger::Env;
 
-    use crate::png_session::{PngRenderer, Text, TextBlock};
+    use crate::{PngRenderer, RenderTextBlock, Text};
 
     #[test]
     fn render_test() {
         env_logger::Builder::from_env(Env::default().default_filter_or("debug")).init();
         let mut renderer = PngRenderer::default();
-        let block = TextBlock {
+        let block = RenderTextBlock {
             align: cosmic_text::Align::Center,
             default_font_size: 1.0,
             default_line_height: 1.2,

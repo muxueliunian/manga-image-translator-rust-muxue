@@ -12,8 +12,8 @@ pub fn render_bboxes(img: &RawImage, qu: &[Quadrilateral], path: &PathBuf) {
     for q in qu {
         let pts = q
             .pts()
-            .into_iter()
-            .map(|v| Point::new(v.0 as i32, v.1 as i32))
+            .iter()
+            .map(|v| Point::new(v.x as i32, v.y as i32))
             .collect::<Vector<Point>>();
         polylines(
             &mut img,

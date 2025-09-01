@@ -4,6 +4,7 @@ use std::{
 };
 
 use geo::{ConvexHull, Distance as _, Euclidean, MinimumRotatedRect, MultiPoint, Point};
+use interface_detector::textlines::MyPoint;
 use interface_ocr::QuadrilateralInfo;
 use interface_translator::{is_valuable_text, Detector, Language};
 use itertools::Itertools as _;
@@ -29,16 +30,17 @@ pub fn dispatch(
         .map(|(txtlns, fg_color, bg_color)| {
             let mut total_logprobs = 0.0;
             for txtln in &txtlns {
-                total_logprobs += txtln.pos.score().ln() * txtln.pos.area();
+                let pos = txtln.pos.lock();
+                total_logprobs += pos.score().ln() * pos.area();
             }
 
-            total_logprobs /= textlines.iter().map(|v| v.pos.area()).sum::<f64>();
+            total_logprobs /= textlines.iter().map(|v| v.pos.lock().area()).sum::<f64>();
             let font_size = txtlns
                 .iter()
-                .map(|v| v.pos.font_size() as u64)
+                .map(|v| v.pos.lock().font_size() as u64)
                 .min()
                 .unwrap_or_default();
-            let mut angle = mean(txtlns.iter().map(|v| v.pos.angle())).unwrap()
+            let mut angle = mean(txtlns.iter().map(|v| v.pos.lock().angle())).unwrap()
                 * (180.0 / std::f64::consts::PI)
                 - 90.0;
             if angle.abs() < 3.0 {
@@ -46,7 +48,7 @@ pub fn dispatch(
             }
             let lines = txtlns
                 .iter()
-                .map(|v| v.pos.pts().clone())
+                .map(|v| v.pos.lock().pts().clone())
                 .collect::<Vec<_>>();
             let texts = txtlns
                 .into_iter()
@@ -128,13 +130,13 @@ pub struct OBB {
 }
 
 pub struct TextBlock {
-    pub lines: Vec<[(i64, i64); 4]>,
+    pub lines: Vec<[MyPoint; 4]>,
     pub text: String,
-    font_size: u64,
+    pub font_size: u64,
     pub angle: f64,
     prob: f64,
-    fg_color: Option<(u8, u8, u8)>,
-    bg_color: Option<(u8, u8, u8)>,
+    pub fg_color: Option<(u8, u8, u8)>,
+    pub bg_color: Option<(u8, u8, u8)>,
     pub skip_translate: bool,
     language: Option<Language>,
     pub translations: HashMap<String, String>,
@@ -162,7 +164,7 @@ impl TextBlock {
         })
     }
     pub fn new(
-        lines: Vec<[(i64, i64); 4]>,
+        lines: Vec<[MyPoint; 4]>,
         texts: Vec<String>,
         font_size: u64,
         angle: f64,
@@ -245,8 +247,8 @@ impl TextBlock {
             .iter()
             .map(|quad| {
                 [
-                    quad[0].0, quad[0].1, quad[1].0, quad[1].1, quad[2].0, quad[2].1, quad[3].0,
-                    quad[3].1,
+                    quad[0].x, quad[0].y, quad[1].x, quad[1].y, quad[2].x, quad[2].y, quad[3].x,
+                    quad[3].y,
                 ]
             })
             .collect();
@@ -281,12 +283,12 @@ impl TextBlock {
         let x = self
             .lines
             .iter()
-            .flat_map(|v| v.into_iter().map(|v| v.0))
+            .flat_map(|v| v.into_iter().map(|v| v.x))
             .collect::<Vec<_>>();
         let y = self
             .lines
             .iter()
-            .flat_map(|v| v.into_iter().map(|v| v.1))
+            .flat_map(|v| v.into_iter().map(|v| v.y))
             .collect::<Vec<_>>();
 
         (
@@ -314,7 +316,16 @@ fn merge_bboxes_text_region(
         graph.add_node(bbox.clone());
     }
     for ((u, ubox), (v, vbox)) in bboxes.iter().enumerate().tuple_combinations() {
-        if quadrilateral_can_merge_region(&ubox.pos, &vbox.pos, 1.9, 2.0, 1.0, 3.0, 2.0, 1.3) {
+        if quadrilateral_can_merge_region(
+            &*ubox.pos.lock(),
+            &*vbox.pos.lock(),
+            1.9,
+            2.0,
+            1.0,
+            3.0,
+            2.0,
+            1.3,
+        ) {
             graph.add_edge((u as u32).into(), (v as u32).into(), ());
         }
     }
@@ -338,7 +349,10 @@ fn merge_bboxes_text_region(
             let bg_r = mean(txtlns.iter().filter_map(|v| v.bg.map(|v| v[0] as f64)));
             let bg_g = mean(txtlns.iter().filter_map(|v| v.bg.map(|v| v[1] as f64)));
             let bg_b = mean(txtlns.iter().filter_map(|v| v.bg.map(|v| v[2] as f64)));
-            let vert = txtlns.iter().map(|v| v.pos.vertical() as u64).sum::<u64>();
+            let vert = txtlns
+                .iter()
+                .map(|v| v.pos.lock().vertical() as u64)
+                .sum::<u64>();
             let count = txtlns.len() as u64;
             let vertical = if vert == count {
                 true
@@ -346,14 +360,14 @@ fn merge_bboxes_text_region(
                 let mut max_aspect_ratio = -100.0;
                 let mut lvert = true;
                 for boxx in txtlns {
-                    let baspect = boxx.pos.aspect_ratio();
+                    let baspect = boxx.pos.lock().aspect_ratio();
                     if baspect > max_aspect_ratio {
                         max_aspect_ratio = baspect;
-                        lvert = boxx.pos.vertical();
+                        lvert = boxx.pos.lock().vertical();
                     }
                     if 1.0 / baspect > max_aspect_ratio {
                         max_aspect_ratio = 1.0 / baspect;
-                        lvert = boxx.pos.vertical();
+                        lvert = boxx.pos.lock().vertical();
                     }
                 }
                 lvert
@@ -363,9 +377,9 @@ fn merge_bboxes_text_region(
                 false
             };
             if vertical {
-                nodes.sort_by_key(|a| OrderedFloat(-bboxes[a.index()].pos.centroid().0));
+                nodes.sort_by_key(|a| OrderedFloat(-bboxes[a.index()].pos.lock().centroid().x));
             } else {
-                nodes.sort_by_key(|a| OrderedFloat(bboxes[a.index()].pos.centroid().1));
+                nodes.sort_by_key(|a| OrderedFloat(bboxes[a.index()].pos.lock().centroid().y));
             }
             let txtlns = nodes.iter().map(|v| &bboxes[v.index()]).collect::<Vec<_>>();
 
@@ -412,12 +426,12 @@ fn split_text_region(
     if connected_region_indices.len() == 2 {
         let fb = &bboxes[connected_region_indices[0].index()];
         let sb = &bboxes[connected_region_indices[1].index()];
-        let fs1 = fb.pos.font_size();
-        let fs2 = sb.pos.font_size();
+        let fs1 = fb.pos.lock().font_size();
+        let fs2 = sb.pos.lock().font_size();
         let fs = fs1.max(fs2);
 
-        if fb.pos.distance(&sb.pos, 0.5) < (1.0 + gamma) * fs
-            && (fb.pos.angle() - sb.pos.angle()).abs() < 0.2 * PI
+        if fb.pos.lock().distance(&sb.pos.lock(), 0.5) < (1.0 + gamma) * fs
+            && (fb.pos.lock().angle() - sb.pos.lock().angle()).abs() < 0.2 * PI
         {
             return vec![connected_region_indices.into_iter().collect()];
         } else {
@@ -435,7 +449,10 @@ fn split_text_region(
         map.insert(bbox.index(), idx);
     }
     for (u, v) in connected_region_indices.iter().tuple_combinations() {
-        let weight = bboxes[u.index()].pos.distance(&bboxes[v.index()].pos, 0.5);
+        let weight = bboxes[u.index()]
+            .pos
+            .lock()
+            .distance(&*bboxes[v.index()].pos.lock(), 0.5);
         graph.add_edge(
             *map.get(&u.index()).unwrap(),
             *map.get(&v.index()).unwrap(),
@@ -462,7 +479,7 @@ fn split_text_region(
     let fontsize = mean(
         connected_region_indices
             .iter()
-            .map(|idx| (bboxes[idx.index()]).pos.font_size()),
+            .map(|idx| (bboxes[idx.index()]).pos.lock().font_size()),
     )
     .unwrap();
 
@@ -470,12 +487,12 @@ fn split_text_region(
     let distances_std = stddev(&distances_sorted).unwrap();
     let std_threshold = f64::max(0.3 * fontsize + 5.0, 5.0);
     let (b1, b2) = (&bboxes[edges[0].0], &bboxes[edges[0].1]);
-    let max_poly_distance = b1.pos.poly_distance(&b2.pos);
-    let b1_centroid = b1.pos.centroid();
-    let b2_centroid = b2.pos.centroid();
+    let max_poly_distance = b1.pos.lock().poly_distance(&b2.pos.lock());
+    let b1_centroid = b1.pos.lock().centroid();
+    let b2_centroid = b2.pos.lock().centroid();
     let max_centroid_alignment = f64::max(
-        (b1_centroid.0 - b2_centroid.0).abs(),
-        (b1_centroid.1 - b2_centroid.1).abs(),
+        (b1_centroid.x - b2_centroid.x).abs(),
+        (b1_centroid.y - b2_centroid.y).abs(),
     );
     if (distances_sorted[0] <= distances_mean + distances_std * sigma
         || distances_sorted[0] <= fontsize * (1.0 + gamma))

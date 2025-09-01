@@ -23,6 +23,11 @@ interface-image.workspace = true
 interface-ocr.workspace = true
 interface-translator.workspace = true
 log.workspace = true
+semver.workspace = true
+ctc-48px.workspace = true
+native.workspace = true
+parking_lot.workspace = true
+tesseract.workspace = true
 
 strum = "0.27.2"
 strum_macros = "0.27.2"
@@ -48,6 +53,8 @@ mask-refinement.workspace = true
 serde_json.workspace = true
 uuid = { workspace = true, features = ["v4"] }
 export.workspace = true
+png.workspace = true
+reqwest = { workspace = true, features = ["json"] }
 
 # ui
 egui = "0.32"

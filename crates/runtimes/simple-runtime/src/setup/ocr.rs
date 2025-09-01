@@ -19,8 +19,10 @@ impl OCRs {
             let ocr = match key {
                 OCR::MangaOcr => {
                     Box::new(manga_ocr::MangaOCR::new(providers.clone(), 256)) as OcrType
-                } // OCR::Native => todo!(),
-                  // OCR::Tesseract => todo!(),
+                }
+                OCR::Native => Box::new(native::NativeOCR::default()) as OcrType,
+                OCR::Tesseract => Box::new(tesseract::TesseractOCR::default()) as OcrType,
+                OCR::Ctc48px => Box::new(ctc_48px::Ctc48pxOcr::new(providers.clone())) as OcrType,
             };
             items.insert(key, ocr);
         }

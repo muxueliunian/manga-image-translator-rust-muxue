@@ -45,10 +45,11 @@ pub fn textline_merge_dispatch(
         f64,
         Option<[u8; 3]>,
         Option<[u8; 3]>,
+        f64,
     )>,
     width: u16,
     height: u16,
-) -> Vec<(String, Vec<[(i64, i64); 4]>, f64)> {
+) -> Vec<(String, Vec<Vec<(i64, i64)>>, f64)> {
     let det = LangIdDetector::new().unwrap();
     let items = items
         .into_iter()
@@ -56,12 +57,22 @@ pub fn textline_merge_dispatch(
             text: v.0,
             fg: v.3,
             bg: v.4,
-            pos: Quadrilateral::new(v.1, v.2),
+            prob: v.5,
+            pos: Arc::new(parking_lot::Mutex::new(Quadrilateral::new(v.1, v.2))),
         })
         .collect::<Vec<_>>();
     let out = textline_merge::dispatch(&items, width, height, &det);
     out.into_iter()
-        .map(|v| (v.text, v.lines, v.angle))
+        .map(|v| {
+            (
+                v.text,
+                v.lines
+                    .into_iter()
+                    .map(|v| v.into_iter().map(|v| (v.x, v.y)).collect::<Vec<_>>())
+                    .collect::<Vec<_>>(),
+                v.angle,
+            )
+        })
         .collect::<Vec<_>>()
 }
 
@@ -413,11 +424,19 @@ impl PyQuadrilateral {
     }
 
     fn pts(&self) -> Vec<(i64, i64)> {
-        self.inner.pts().to_vec()
+        self.inner
+            .pts()
+            .iter()
+            .map(|v| (v.x, v.y))
+            .collect::<Vec<_>>()
     }
 
     fn structure(&self) -> Vec<(i64, i64)> {
-        self.inner.structure().to_vec()
+        self.inner
+            .structure()
+            .iter()
+            .map(|v| (v.x, v.y))
+            .collect::<Vec<_>>()
     }
 }
 

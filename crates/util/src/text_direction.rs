@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::f64;
+use std::sync::Arc;
 
 use interface_detector::textlines::Quadrilateral;
 use itertools::Itertools;
@@ -32,21 +33,34 @@ pub fn connected_components_sets<N, E>(
     groups.into_values().collect()
 }
 
-fn generate_text_direction(
-    bboxes: Vec<Quadrilateral>,
-) -> impl Iterator<Item = (Quadrilateral, bool)> {
-    let mut graph: Graph<Quadrilateral, (), petgraph::Undirected> = Graph::new_undirected();
+pub fn generate_text_direction(
+    bboxes: Vec<Arc<parking_lot::Mutex<Quadrilateral>>>,
+) -> impl Iterator<Item = (Arc<parking_lot::Mutex<Quadrilateral>>, bool)> {
+    let mut graph: Graph<Arc<parking_lot::Mutex<Quadrilateral>>, (), petgraph::Undirected> =
+        Graph::new_undirected();
     for bbox in bboxes.clone() {
         graph.add_node(bbox);
     }
     for ((u, ubox), (v, vbox)) in bboxes.iter().enumerate().tuple_combinations() {
-        if quadrilateral_can_merge_region(ubox, vbox, 1.9, 2.0, 0.6, 1.5, 1.5, 1.0) {
+        if quadrilateral_can_merge_region(
+            &*ubox.lock(),
+            &*vbox.lock(),
+            1.9,
+            2.0,
+            0.6,
+            1.5,
+            1.5,
+            1.0,
+        ) {
             graph.add_edge((u as u32).into(), (v as u32).into(), ());
         }
     }
     let components = connected_components_sets(&graph);
     components.into_iter().flat_map(move |nodes| {
-        let vertical_dirs: Vec<_> = nodes.iter().map(|&node| graph[node].vertical()).collect();
+        let vertical_dirs: Vec<_> = nodes
+            .iter()
+            .map(|&node| graph[node].lock().vertical())
+            .collect();
         let vertical_count = vertical_dirs.iter().filter(|&&v| v).count();
 
         let majority_vertical = vertical_count > vertical_dirs.len() / 2;
@@ -54,14 +68,20 @@ fn generate_text_direction(
         if majority_vertical {
             nodes
                 .into_iter()
-                .sorted_by_key(|&node| -(graph[node].aabb().x + graph[node].aabb().w))
+                .sorted_by_key(|&node| {
+                    let aabb = graph[node].lock().aabb();
+                    -(aabb.x + aabb.w)
+                })
                 .map(|node| (graph[node].clone(), majority_vertical))
                 .collect::<Vec<_>>()
                 .into_iter()
         } else {
             nodes
                 .into_iter()
-                .sorted_by_key(|&node| graph[node].aabb().y + graph[node].aabb().h / 2)
+                .sorted_by_key(|&node| {
+                    let aabb = graph[node].lock().aabb();
+                    aabb.y + aabb.h / 2
+                })
                 .map(|node| (graph[node].clone(), majority_vertical))
                 .collect::<Vec<_>>()
                 .into_iter()

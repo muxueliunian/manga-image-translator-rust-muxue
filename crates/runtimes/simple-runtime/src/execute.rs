@@ -78,6 +78,10 @@ impl Models {
                 .unwrap();
             render_bboxes(&img, &areas, debug_path);
         }
+        let areas = areas
+            .into_iter()
+            .map(|v| Arc::new(parking_lot::Mutex::new(v)))
+            .collect::<Vec<_>>();
 
         let img = Arc::new(img);
         let textlines = self

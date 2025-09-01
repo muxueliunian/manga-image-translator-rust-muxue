@@ -1,0 +1,24 @@
+[package]
+name = "ctc-48px"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+ort.workspace = true
+ndarray.workspace = true
+interface-image.workspace = true
+image.workspace = true
+ndarray-stats.workspace = true
+interface-ocr.workspace = true
+async-trait.workspace = true
+anyhow.workspace = true
+interface-detector.workspace = true
+util.workspace = true
+interface-model.workspace = true
+maplit.workspace = true
+base-util.workspace = true
+parking_lot.workspace = true
+opencv.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

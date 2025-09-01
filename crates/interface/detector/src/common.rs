@@ -64,9 +64,9 @@ pub fn detect(
                 Quadrilateral::new(
                     v.pts()
                         .iter()
-                        .map(|&(x, y)| {
-                            let new_x = y;
-                            let new_y = -x + img_h;
+                        .map(|&point| {
+                            let new_x = point.y;
+                            let new_y = -point.x + img_h;
                             (new_x, new_y)
                         })
                         .collect(),

@@ -66,6 +66,11 @@ lama_mpe = { path = "crates/modules/inpainter/lama_mpe" }
 manga-ocr = { path = "crates/modules/ocr/manga-ocr" }
 mask-refinement = { path = "crates/mask-refinement" }
 export = { path = "crates/modules/renderer/export" }
+png = { path = "crates/modules/renderer/png" }
+tesseract = { path = "crates/modules/ocr/tesseract" }
+native = { path = "crates/modules/ocr/native" }
+ctc-48px = { path = "crates/modules/ocr/ctc-48px" }
+
 show-image = "0.13"
 thiserror = "2.0"
 parking_lot = "0.12.4"
@@ -92,6 +97,9 @@ uni-ocr = "0.1.5"
 async-trait = "0.1.89"
 pyo3 = "0.25.1"
 uuid = "1.18.0"
+ndarray-stats = "0.6.0"
+reqwest = "0.12.23"
+semver = "1.0.26"
 
 [patch.crates-io]
 clipper2c-sys = { git = "https://github.com/tirithen/clipper2c-sys" }

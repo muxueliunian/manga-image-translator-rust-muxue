@@ -16,6 +16,7 @@ use ort::{
     session::{RunOptions, Session},
     value::Tensor,
 };
+use parking_lot::Mutex;
 use tokio::task::spawn_blocking;
 
 pub struct MangaOCRModels {
@@ -98,7 +99,7 @@ impl interface_ocr::Ocr for MangaOCR {
     async fn detect(
         &mut self,
         image: &Arc<interface_image::RawImage>,
-        areas: &[Quadrilateral],
+        areas: &[Arc<Mutex<Quadrilateral>>],
         img_processor: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<Vec<interface_ocr::QuadrilateralInfo>> {
         let mut texts = vec![];
@@ -114,7 +115,7 @@ impl interface_ocr::Ocr for MangaOCR {
         })
         .await?;
         for (index, area) in areas.iter().enumerate() {
-            let bbox = area.aabb();
+            let bbox = area.lock().aabb();
             let grayscale = grayscale.clone();
             let img = tokio::task::spawn_blocking(move || {
                 let view =
@@ -137,7 +138,7 @@ impl interface_ocr::Ocr for MangaOCR {
     async fn detect_patch(
         &mut self,
         image: Mask,
-        area: Quadrilateral,
+        area: Arc<Mutex<Quadrilateral>>,
         img_processor: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<QuadrilateralInfo> {
         self.load()?;
@@ -194,6 +195,7 @@ impl interface_ocr::Ocr for MangaOCR {
             fg: None,
             bg: None,
             pos: area.clone(),
+            prob: 1.0,
         })
     }
 }
@@ -223,6 +225,7 @@ mod tests {
     use interface_detector::textlines::Quadrilateral;
     use interface_image::{CpuImageProcessor, ImageOp, RawImage};
     use interface_ocr::Ocr as _;
+    use parking_lot::Mutex;
 
     use crate::MangaOCR;
 
@@ -232,8 +235,14 @@ mod tests {
             .expect("Failed to load image");
         let mut mocr = MangaOCR::new(all_providers(), 255);
         let inp = vec![
-            Quadrilateral::new(vec![(208, 4), (246, 4), (246, 192), (208, 192)], 1.0),
-            Quadrilateral::new(vec![(76, 1788), (128, 1788), (128, 1930), (76, 1930)], 1.0),
+            Arc::new(Mutex::new(Quadrilateral::new(
+                vec![(208, 4), (246, 4), (246, 192), (208, 192)],
+                1.0,
+            ))),
+            Arc::new(Mutex::new(Quadrilateral::new(
+                vec![(76, 1788), (128, 1788), (128, 1930), (76, 1930)],
+                1.0,
+            ))),
         ];
         let ip = Arc::new(CpuImageProcessor::default()) as Arc<dyn ImageOp + Send + Sync>;
         let v = mocr.detect(&Arc::new(img), &inp, &ip).await.unwrap();

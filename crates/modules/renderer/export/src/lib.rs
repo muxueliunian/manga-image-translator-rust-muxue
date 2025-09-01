@@ -1,13 +1,14 @@
 use std::{io::Cursor, ops::Deref};
 
 use image::{
-    write_buffer_with_format, DynamicImage, EncodableLayout, GenericImageView, ImageBuffer,
-    ImageFormat, Pixel, PixelWithColorType,
+    guess_format, write_buffer_with_format, DynamicImage, EncodableLayout, GenericImageView,
+    ImageBuffer, ImageFormat, Pixel, PixelWithColorType,
 };
+use interface_image::RawImage;
 use textline_merge::TextBlock;
 pub struct Export {
     img: Image,
-    patches: Vec<Patch>,
+    pub patches: Vec<Patch>,
 }
 
 fn convert<P: Pixel + PixelWithColorType, Container>(
@@ -92,6 +93,10 @@ impl Export {
             patches,
         }
     }
+
+    pub fn get_image(&self) -> RawImage {
+        (&self.img).into()
+    }
 }
 
 pub struct Image {
@@ -99,6 +104,61 @@ pub struct Image {
     height: u16,
     data: Vec<u8>,
     raw: bool,
+}
+
+impl From<&Image> for RawImage {
+    fn from(value: &Image) -> Self {
+        if value.raw {
+            RawImage {
+                data: value.data.clone(),
+                width: value.width,
+                height: value.height,
+                channels: (value.data.len() / (value.width as usize * value.height as usize)) as u8,
+            }
+        } else {
+            let img =
+                image::load(Cursor::new(&value.data), guess_format(&value.data).unwrap()).unwrap();
+            let w = img.width() as u16;
+            let h = img.height() as u16;
+            let (data, channels) = match img {
+                DynamicImage::ImageLuma8(image_buffer) => (image_buffer.into_raw(), 1),
+                DynamicImage::ImageLumaA8(image_buffer) => (image_buffer.into_raw(), 2),
+                DynamicImage::ImageRgb8(image_buffer) => (image_buffer.into_raw(), 3),
+                DynamicImage::ImageRgba8(image_buffer) => (image_buffer.into_raw(), 4),
+                DynamicImage::ImageLuma16(image_buffer) => {
+                    let img = DynamicImage::from(image_buffer).to_luma8();
+                    (img.into_raw(), 1)
+                }
+                DynamicImage::ImageLumaA16(image_buffer) => {
+                    let img = DynamicImage::from(image_buffer).to_luma_alpha8();
+                    (img.into_raw(), 2)
+                }
+                DynamicImage::ImageRgb16(image_buffer) => {
+                    let img = DynamicImage::from(image_buffer).to_rgb8();
+                    (img.into_raw(), 3)
+                }
+                DynamicImage::ImageRgba16(image_buffer) => {
+                    let img = DynamicImage::from(image_buffer).to_rgba8();
+                    (img.into_raw(), 4)
+                }
+                DynamicImage::ImageRgb32F(image_buffer) => {
+                    let img = DynamicImage::from(image_buffer).to_rgb8();
+                    (img.into_raw(), 3)
+                }
+                DynamicImage::ImageRgba32F(image_buffer) => {
+                    let img = DynamicImage::from(image_buffer).to_rgba8();
+                    (img.into_raw(), 4)
+                }
+                _ => unreachable!(),
+            };
+            RawImage {
+                data,
+                width: w,
+                height: h,
+                channels,
+            }
+        }
+    }
 }
 
 impl Image {
@@ -124,7 +184,13 @@ pub struct Point {
 }
 
 pub struct Patch {
-    info: TextBlock,
-    pos: (usize, usize),
+    pub info: TextBlock,
+    pub pos: (usize, usize),
     bg: Image,
+}
+
+impl Patch {
+    pub fn get_image(&self) -> RawImage {
+        (&self.bg).into()
+    }
 }

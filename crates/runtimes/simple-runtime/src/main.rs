@@ -3,9 +3,10 @@ use std::{fs::create_dir_all, path::PathBuf};
 use clap::Parser as _;
 use config::Config;
 use log::{error, warn};
+use png::{MyAlign, PngRenderConfig};
 use walkdir::WalkDir;
 
-use crate::{settings::Settings, setup::Models};
+use crate::{settings::Settings, setup::Models, update::check_crate_version};
 
 pub mod cli;
 mod debug;
@@ -14,6 +15,7 @@ mod execute;
 pub mod settings;
 pub mod setup;
 mod ui;
+mod update;
 
 #[tokio::main]
 async fn main() {
@@ -42,7 +44,9 @@ async fn main() {
         .expect("Failed to run egui");
         return;
     }
+
     let cli = cli::Cli::parse();
+    let _ = check_crate_version("frederik-uni/manga-image-translator-rust").await;
     let mut input = WalkDir::new(&cli.input)
         .into_iter()
         .filter_map(|v| v.ok())
@@ -79,6 +83,7 @@ async fn main() {
             })
             .collect::<Vec<_>>();
     }
+    let mut renderer = png::PngRenderer::default();
     let mut models = Models::new(2, true, false).await;
     for path in input {
         let path = cli.input.join(path);
@@ -101,6 +106,22 @@ async fn main() {
         } else {
             None
         };
-        models.execute(img, &settings, debug_path).await;
+        let exp = models.execute(img, &settings, debug_path).await;
+        //TODO: from config
+        renderer.render(
+            exp,
+            PngRenderConfig {
+                min_fontsize: 2.0,
+                max_fontsize: 20.0,
+                detect_offset: 1000000.0,
+                fg_color: None,
+                bg_color: None,
+                align: MyAlign::Center,
+                letter_spacing: None,
+                font_size: 0.0,
+                line_height: 0.0,
+                family: None,
+            },
+        );
     }
 }

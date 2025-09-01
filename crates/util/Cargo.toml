@@ -8,6 +8,7 @@ ndarray-npy = { workspace = true }
 opencv = { workspace = true, default-features = false, features = [
     "imgproc",
     "clang-runtime",
+    "calib3d",
 ] }
 petgraph.workspace = true
 itertools.workspace = true
@@ -26,8 +27,10 @@ ort = { workspace = true, features = [
     "coreml",
 ] }
 ndarray-linalg = { workspace = true, features = ["intel-mkl-static"] }
-rayon = "1.10.0"
+rayon.workspace = true
 base-util = { workspace = true, features = ["onnx", "opencv"] }
+image.workspace = true
+parking_lot.workspace = true
 
 [dev-dependencies]
 criterion = "0.6.0"

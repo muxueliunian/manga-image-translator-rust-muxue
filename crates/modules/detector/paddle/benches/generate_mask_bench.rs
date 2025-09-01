@@ -1,4 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use interface_detector::textlines::MyPoint;
 use paddle::fill_polys_mask;
 use rand::Rng as _;
 
@@ -7,9 +8,9 @@ pub fn generate_random_non_overlapping_rects(
     width: usize,
     height: usize,
     max_coverage: f64,
-) -> Vec<[(i64, i64); 4]> {
+) -> Vec<[MyPoint; 4]> {
     let mut rng = rand::thread_rng();
-    let mut rects: Vec<[(i64, i64); 4]> = Vec::with_capacity(count);
+    let mut rects: Vec<[MyPoint; 4]> = Vec::with_capacity(count);
 
     let image_area = (width * height) as f64;
     let target_area = image_area * max_coverage;
@@ -25,15 +26,20 @@ pub fn generate_random_non_overlapping_rects(
         let x1 = x0 + w;
         let y1 = y0 + h;
 
-        for &[(ax0, ay0), (_, ay1), (ax1, _), _] in &rects {
-            let overlap_x = (x0 < ax1) && (x1 > ax0);
-            let overlap_y = (y0 < ay1) && (y1 > ay0);
+        for &[a0, ay1, ax1, _] in &rects {
+            let overlap_x = (x0 < ax1.x) && (x1 > a0.x);
+            let overlap_y = (y0 < ay1.y) && (y1 > a0.y);
             if overlap_x && overlap_y {
                 continue 'outer;
             }
         }
 
-        rects.push([(x0, y0), (x0, y1), (x1, y1), (x1, y0)]);
+        rects.push([
+            MyPoint::from((x0, y0)),
+            MyPoint::from((x0, y1)),
+            MyPoint::from((x1, y1)),
+            MyPoint::from((x1, y0)),
+        ]);
         total_area += (w * h) as f64;
     }
 

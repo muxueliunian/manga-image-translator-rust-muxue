@@ -1,26 +1,14 @@
+use interface_detector::textlines::MyPoint;
 use interface_image::Mask;
 
-type Quad = [(i64, i64); 4];
+type Quad = [MyPoint; 4];
 
-fn point_to_vec(p: (i64, i64)) -> (f64, f64) {
-    (p.0 as f64, p.1 as f64)
-}
-fn vec_sub(a: (f64, f64), b: (f64, f64)) -> (f64, f64) {
-    (a.0 - b.0, a.1 - b.1)
-}
-fn vec_add(a: (f64, f64), b: (f64, f64)) -> (f64, f64) {
-    (a.0 + b.0, a.1 + b.1)
-}
-fn vec_mul_scalar(v: (f64, f64), s: f64) -> (f64, f64) {
-    (v.0 * s, v.1 * s)
-}
-
-fn vec_normalize(v: (f64, f64)) -> (f64, f64) {
-    let len = (v.0 * v.0 + v.1 * v.1).sqrt();
+fn vec_normalize(v: MyPoint<f64>) -> MyPoint<f64> {
+    let len = (v.x * v.x + v.y * v.y).sqrt();
     if len == 0.0 {
-        (0.0, 0.0)
+        (0.0, 0.0).into()
     } else {
-        (v.0 / len, v.1 / len)
+        (v.x / len, v.y / len).into()
     }
 }
 
@@ -48,77 +36,71 @@ fn vec_normalize(v: (f64, f64)) -> (f64, f64) {
 /// t = \frac{(x_2 - x_1) \cdot dy_2 - (y_2 - y_1) \cdot dx_2}{D}
 /// $$
 pub fn expand_right_to_connect(quad1: &Quad, quad2: &Quad) -> Quad {
-    let tl1 = point_to_vec(quad1[0]);
-    let tr1 = point_to_vec(quad1[1]);
-    let v1 = vec_sub(tr1, tl1);
-    let tl2 = point_to_vec(quad2[0]);
-    let bl2 = point_to_vec(quad2[3]);
-    let w = vec_sub(bl2, tl2);
-    let br1 = point_to_vec(quad1[2]);
-    let bl1 = point_to_vec(quad1[3]);
-    let v2 = vec_sub(br1, bl1);
-    let d1 = v1.0 * w.1 - v1.1 * w.0;
-    let d2 = v2.0 * w.1 - v2.1 * w.0;
+    let tl1 = quad1[0].to_f64();
+    let tr1 = quad1[1].to_f64();
+    let v1 = tr1 - tl1;
+    let tl2 = quad2[0].to_f64();
+    let bl2 = quad2[3].to_f64();
+    let w = bl2 - tl2;
+    let br1 = quad1[2].to_f64();
+    let bl1 = quad1[3].to_f64();
+    let v2 = br1 - bl1;
+    let d1 = v1.x * w.y - v1.y * w.x;
+    let d2 = v2.x * w.y - v2.y * w.x;
     if d1 < (10.0_f64.powi(-9)) || d2 < (10.0_f64.powi(-9)) {
         return *quad1;
     }
-    let t1 = ((tl2.0 - tl1.0) * w.1 - (tl2.1 - tl1.1) * w.0) / d1;
-    let t2 = ((tl2.0 - bl1.0) * w.1 - (tl2.1 - bl1.1) * w.0) / d2;
+    let t1 = ((tl2.x - tl1.x) * w.y - (tl2.y - tl1.y) * w.x) / d1;
+    let t2 = ((tl2.x - bl1.x) * w.y - (tl2.y - bl1.y) * w.x) / d2;
 
-    let new_top = vec_add(vec_mul_scalar(v1, t1), tl1);
-    let new_bottom = vec_add(vec_mul_scalar(v2, t2), bl1);
+    let new_top = v1 * t1 + tl1;
+    let new_bottom = v2 * t2 + bl1;
 
     [
-        (tl1.0 as i64, tl1.1 as i64),
-        (new_top.0.ceil() as i64, new_top.1.ceil() as i64),
-        (new_bottom.0.ceil() as i64, new_bottom.1.ceil() as i64),
-        (bl1.0 as i64, bl1.1 as i64),
+        (tl1.x as i64, tl1.y as i64).into(),
+        (new_top.x.ceil() as i64, new_top.y.ceil() as i64).into(),
+        (new_bottom.x.ceil() as i64, new_bottom.y.ceil() as i64).into(),
+        (bl1.x as i64, bl1.y as i64).into(),
     ]
 }
 
 pub fn expand_top_to_connect(quad1: &Quad, quad2: &Quad) -> Quad {
-    let tl1 = point_to_vec(quad1[0]);
-    let tr1 = point_to_vec(quad1[1]);
-    let br1 = point_to_vec(quad1[2]);
-    let bl1 = point_to_vec(quad1[3]);
-    let v1 = vec_sub(tr1, br1);
-    let bl2 = point_to_vec(quad2[3]);
-    let br2 = point_to_vec(quad2[1]);
-    let w = vec_sub(bl2, br2);
-    let v2 = vec_sub(tl1, bl1);
-    let d1 = v1.0 * w.1 - v1.1 * w.0;
-    let d2 = v2.0 * w.1 - v2.1 * w.0;
+    let tl1 = quad1[0].to_f64();
+    let tr1 = quad1[1].to_f64();
+    let br1 = quad1[2].to_f64();
+    let bl1 = quad1[3].to_f64();
+    let v1 = tr1 - br1;
+    let bl2 = quad2[3].to_f64();
+    let br2 = quad2[1].to_f64();
+    let w = bl2 - br2;
+    let v2 = tl1 - bl1;
+    let d1 = v1.x * w.y - v1.y * w.x;
+    let d2 = v2.x * w.y - v2.y * w.x;
     if d1 < (10.0_f64.powi(-9)) || d2 < (10.0_f64.powi(-9)) {
         return *quad1;
     }
-    let t1 = ((br2.0 - br1.0) * w.1 - (br2.1 - br1.1) * w.0) / d1;
-    let t2 = ((br2.0 - bl1.0) * w.1 - (br2.1 - bl1.1) * w.0) / d2;
+    let t1 = ((br2.x - br1.x) * w.y - (br2.y - br1.y) * w.x) / d1;
+    let t2 = ((br2.x - bl1.x) * w.y - (br2.y - bl1.y) * w.x) / d2;
 
-    let new_top = vec_add(vec_mul_scalar(v1, t1), tl1);
-    let new_bottom = vec_add(vec_mul_scalar(v2, t2), bl1);
+    let new_top = v1 * t1 + tl1;
+    let new_bottom = v2 * t2 + bl1;
 
     [
-        (tl1.0 as i64, tl1.1 as i64),
-        (new_top.0.ceil() as i64, new_top.1.ceil() as i64),
-        (new_bottom.0.ceil() as i64, new_bottom.1.ceil() as i64),
-        (bl1.0 as i64, bl1.1 as i64),
+        (tl1.x as i64, tl1.y as i64).into(),
+        (new_top.x.ceil() as i64, new_top.y.ceil() as i64).into(),
+        (new_bottom.x.ceil() as i64, new_bottom.y.ceil() as i64).into(),
+        (bl1.x as i64, bl1.y as i64).into(),
     ]
 }
 
-pub fn expand_top_quad(quad: [(i64, i64); 4], factor: f64) -> [(i64, i64); 4] {
+pub fn expand_top_quad(quad: Quad, factor: f64) -> Quad {
     let (top_left, top_right, bottom_right, bottom_left) = (quad[0], quad[1], quad[2], quad[3]);
 
-    let left_vec = (top_left.0 - bottom_left.0, top_left.1 - bottom_left.1);
-    let right_vec = (top_right.0 - bottom_right.0, top_right.1 - bottom_right.1);
+    let left_vec = top_left - bottom_left;
+    let right_vec = top_right - bottom_right;
 
-    let new_top_left = (
-        bottom_left.0 + (factor * left_vec.0 as f64) as i64,
-        bottom_left.1 + (factor * left_vec.1 as f64) as i64,
-    );
-    let new_top_right = (
-        bottom_right.0 + (factor * right_vec.0 as f64) as i64,
-        bottom_right.1 + (factor * right_vec.1 as f64) as i64,
-    );
+    let new_top_left = (left_vec.to_f64() * factor).to_i64() + bottom_left;
+    let new_top_right = (right_vec.to_f64() * factor).to_i64() + bottom_right;
 
     [
         new_top_left,  // moved upward
@@ -128,23 +110,13 @@ pub fn expand_top_quad(quad: [(i64, i64); 4], factor: f64) -> [(i64, i64); 4] {
     ]
 }
 
-pub fn expand_right_quad(quad: [(i64, i64); 4], factor: f64) -> [(i64, i64); 4] {
+pub fn expand_right_quad(quad: Quad, factor: f64) -> Quad {
     let (top_left, top_right, bottom_right, bottom_left) = (quad[0], quad[1], quad[2], quad[3]);
 
-    let top_vec = (top_right.0 - top_left.0, top_right.1 - top_left.1);
-    let bottom_vec = (
-        bottom_right.0 - bottom_left.0,
-        bottom_right.1 - bottom_left.1,
-    );
-
-    let new_top_right = (
-        top_left.0 + (factor * top_vec.0 as f64) as i64,
-        top_left.1 + (factor * top_vec.1 as f64) as i64,
-    );
-    let new_bottom_right = (
-        bottom_left.0 + (factor * bottom_vec.0 as f64) as i64,
-        bottom_left.1 + (factor * bottom_vec.1 as f64) as i64,
-    );
+    let top_vec = top_right - top_left;
+    let bottom_vec = bottom_right - bottom_left;
+    let new_top_right = (top_vec.to_f64() * factor).to_i64() + top_left;
+    let new_bottom_right = (bottom_vec.to_f64() * factor).to_i64() + bottom_left;
 
     [
         top_left,         // unchanged
@@ -154,9 +126,9 @@ pub fn expand_right_quad(quad: [(i64, i64); 4], factor: f64) -> [(i64, i64); 4] 
     ]
 }
 
-fn sample_line_nonzero(mask: &Mask, start: (f64, f64), end: (f64, f64)) -> usize {
-    let (mut x0, mut y0) = (start.0 as i64, start.1 as i64);
-    let (x1, y1) = (end.0 as i64, end.1 as i64);
+fn sample_line_nonzero(mask: &Mask, start: MyPoint<f64>, end: MyPoint<f64>) -> usize {
+    let (mut x0, mut y0) = (start.x as i64, start.y as i64);
+    let (x1, y1) = (end.x as i64, end.y as i64);
     let dx = (x1 - x0).abs();
     let dy = -(y1 - y0).abs();
     let sx = if x0 < x1 { 1 } else { -1 };
@@ -184,24 +156,24 @@ fn sample_line_nonzero(mask: &Mask, start: (f64, f64), end: (f64, f64)) -> usize
     count
 }
 
-pub fn shrink_quad_top(quad: [(i64, i64); 4], mask: &Mask) -> [(i64, i64); 4] {
-    let p1 = point_to_vec(quad[2]); // br
-    let p2 = point_to_vec(quad[3]); // bl
-    let mut tr = point_to_vec(quad[1]);
-    let mut tl = point_to_vec(quad[0]);
+pub fn shrink_quad_top(quad: Quad, mask: &Mask) -> Quad {
+    let p1 = quad[2].to_f64(); // br
+    let p2 = quad[3].to_f64(); // bl
+    let mut tr = quad[1].to_f64();
+    let mut tl = quad[0].to_f64();
 
-    let v1 = vec_sub(tr, p1);
-    let v2 = vec_sub(tl, p2);
-    let len_v1 = (v1.0 * v1.0 + v1.1 * v1.1).sqrt();
-    let len_v2 = (v2.0 * v2.0 + v2.1 * v2.1).sqrt();
+    let v1 = tr - p1;
+    let v2 = tl - p2;
+    let len_v1 = (v1.x * v1.x + v1.y * v1.y).sqrt();
+    let len_v2 = (v2.x * v2.x + v2.y * v2.y).sqrt();
 
     let half_len_v1 = len_v1 / 2.0;
     let half_len_v2 = len_v2 / 2.0;
 
     let dir_v1 = vec_normalize(v1);
     let dir_v2 = vec_normalize(v2);
-    let step1 = vec_mul_scalar(dir_v1, -1.0);
-    let step2 = vec_mul_scalar(dir_v2, -1.0);
+    let step1 = dir_v1 * -1.0;
+    let step2 = dir_v2 * -1.0;
 
     let mut moved_v1 = 0.0;
     let mut moved_v2 = 0.0;
@@ -214,44 +186,44 @@ pub fn shrink_quad_top(quad: [(i64, i64); 4], mask: &Mask) -> [(i64, i64); 4] {
             break;
         }
 
-        tr = vec_add(tr, step1);
-        tl = vec_add(tl, step2);
+        tr = tr + step1;
+        tl = tl + step2;
 
         moved_v1 += 1.0;
         moved_v2 += 1.0;
     }
 
     if moved_v1 < half_len_v1 || moved_v2 < half_len_v2 {
-        tr = vec_sub(tr, vec_mul_scalar(step1, 2.0));
-        tl = vec_sub(tl, vec_mul_scalar(step2, 2.0));
+        tr = tr - (step1 * 2.0);
+        tl = tl - (step2 * 2.0);
     }
 
     [
-        (tl.0 as i64, tl.1 as i64),
-        (tr.0 as i64, tr.1 as i64),
-        (p1.0 as i64, p1.1 as i64),
-        (p2.0 as i64, p2.1 as i64),
+        (tl.x as i64, tl.y as i64).into(),
+        (tr.x as i64, tr.y as i64).into(),
+        (p1.x as i64, p1.y as i64).into(),
+        (p2.x as i64, p2.y as i64).into(),
     ]
 }
 
-pub fn shrink_quad_right(quad: [(i64, i64); 4], mask: &Mask) -> [(i64, i64); 4] {
-    let p1 = point_to_vec(quad[0]);
-    let p2 = point_to_vec(quad[3]);
-    let mut tr = point_to_vec(quad[1]);
-    let mut br = point_to_vec(quad[2]);
+pub fn shrink_quad_right(quad: Quad, mask: &Mask) -> Quad {
+    let p1 = quad[0].to_f64();
+    let p2 = quad[3].to_f64();
+    let mut tr = quad[1].to_f64();
+    let mut br = quad[2].to_f64();
 
-    let v1 = vec_sub(tr, p1);
-    let v2 = vec_sub(br, p2);
-    let len_v1 = (v1.0 * v1.0 + v1.1 * v1.1).sqrt();
-    let len_v2 = (v2.0 * v2.0 + v2.1 * v2.1).sqrt();
+    let v1 = tr - p1;
+    let v2 = br - p2;
+    let len_v1 = (v1.x * v1.x + v1.y * v1.y).sqrt();
+    let len_v2 = (v2.x * v2.x + v2.y * v2.y).sqrt();
 
     let half_len_v1 = len_v1 / 2.0;
     let half_len_v2 = len_v2 / 2.0;
 
     let dir_v1 = vec_normalize(v1);
     let dir_v2 = vec_normalize(v2);
-    let step1 = vec_mul_scalar(dir_v1, -1.0);
-    let step2 = vec_mul_scalar(dir_v2, -1.0);
+    let step1 = dir_v1 * -1.0;
+    let step2 = dir_v2 * -1.0;
 
     let mut moved_v1 = 0.0;
     let mut moved_v2 = 0.0;
@@ -264,22 +236,22 @@ pub fn shrink_quad_right(quad: [(i64, i64); 4], mask: &Mask) -> [(i64, i64); 4] 
             break;
         }
 
-        tr = vec_add(tr, step1);
-        br = vec_add(br, step2);
+        tr = tr + step1;
+        br = br + step2;
 
         moved_v1 += 1.0;
         moved_v2 += 1.0;
     }
 
     if moved_v1 < half_len_v1 || moved_v2 < half_len_v2 {
-        tr = vec_sub(tr, vec_mul_scalar(step1, 2.0));
-        br = vec_sub(br, vec_mul_scalar(step2, 2.0));
+        tr = tr - (step1 * 2.0);
+        br = br - (step2 * 2.0);
     }
 
     [
-        (p1.0 as i64, p1.1 as i64),
-        (tr.0 as i64, tr.1 as i64),
-        (br.0 as i64, br.1 as i64),
-        (p2.0 as i64, p2.1 as i64),
+        (p1.x as i64, p1.y as i64).into(),
+        (tr.x as i64, tr.y as i64).into(),
+        (br.x as i64, br.y as i64).into(),
+        (p2.x as i64, p2.y as i64).into(),
     ]
 }

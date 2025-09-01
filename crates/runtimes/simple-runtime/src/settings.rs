@@ -101,8 +101,9 @@ pub struct Translation {
 pub enum OCR {
     #[default]
     MangaOcr,
-    // Native,
-    // Tesseract,
+    Native,
+    Tesseract,
+    Ctc48px,
 }
 #[derive(Serialize, Deserialize, Default, EnumIter, Hash, PartialEq, Eq, Copy, Clone)]
 pub enum Translator {

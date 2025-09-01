@@ -3,7 +3,7 @@ mod expand;
 
 use std::{borrow::Cow, i32, sync::Arc};
 
-use interface_detector::textlines::{BBox, Quadrilateral};
+use interface_detector::textlines::{BBox, MyPoint, Quadrilateral};
 use interface_image::{ImageOp, Mask, RawImage};
 use opencv::{
     core::{
@@ -29,15 +29,15 @@ pub enum Method {
     FillMask,
 }
 
-pub fn expand(furi: bool, lines: &[[(i64, i64); 4]], mask: &Mask) -> Vec<Quadrilateral> {
+pub fn expand(furi: bool, lines: &[[MyPoint; 4]], mask: &Mask) -> Vec<Quadrilateral> {
     let mut out = Vec::with_capacity(lines.len());
     let mut lines = lines.iter().rev().peekable();
     while let Some(line) = lines.next() {
-        let line_ = Quadrilateral::new(line.to_vec(), 0.0);
+        let line_ = Quadrilateral::new2(line.to_vec(), 0.0);
         if furi {
             let peek = lines.peek();
             match line_.vertical() {
-                true => out.push(Quadrilateral::new(
+                true => out.push(Quadrilateral::new2(
                     match peek {
                         Some(n) => expand_right_to_connect(line, n),
                         None => shrink_quad_right(expand_right_quad(*line, 2.0), mask),
@@ -45,7 +45,7 @@ pub fn expand(furi: bool, lines: &[[(i64, i64); 4]], mask: &Mask) -> Vec<Quadril
                     .to_vec(),
                     0.0,
                 )),
-                false => out.push(Quadrilateral::new(
+                false => out.push(Quadrilateral::new2(
                     match peek {
                         Some(n) => expand_top_to_connect(line, n),
                         None => shrink_quad_top(expand_top_quad(*line, 2.0), mask),

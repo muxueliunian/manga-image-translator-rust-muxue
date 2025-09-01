@@ -35,13 +35,22 @@ pub struct RawImage {
     pub channels: u8,
 }
 
-fn blend_pixel(s_rgba: [u8; 4], o_rgba: [u8; 4]) -> [u8; 4] {
-    let sa = s_rgba[3] as f32 / 255.0;
-    let oa = o_rgba[3] as f32 / 255.0;
+fn blend_pixel3(s_rgb: [u8; 3], o_rgba: [u8; 4]) -> [u8; 3] {
+    let alpha = o_rgba[3] as f32 / 255.0;
+    [
+        ((o_rgba[0] as f32 * alpha) + (s_rgb[0] as f32 * (1.0 - alpha))).round() as u8,
+        ((o_rgba[1] as f32 * alpha) + (s_rgb[1] as f32 * (1.0 - alpha))).round() as u8,
+        ((o_rgba[2] as f32 * alpha) + (s_rgb[2] as f32 * (1.0 - alpha))).round() as u8,
+    ]
+}
 
-    if oa >= 1.0 {
+fn blend_pixel4(s_rgba: [u8; 4], o_rgba: [u8; 4]) -> [u8; 4] {
+    if o_rgba[3] == 255 {
         return o_rgba;
     }
+
+    let sa = s_rgba[3] as f32 / 255.0;
+    let oa = o_rgba[3] as f32 / 255.0;
 
     let out_a = oa + sa * (1.0 - oa);
 
@@ -68,6 +77,61 @@ impl RawImage {
         self.data = result;
         self
     }
+
+    pub unsafe fn set_rgba_pixel(&mut self, x: u16, y: u16, rgba: [u8; 4]) {
+        let idx = (y as usize * self.width as usize + x as usize) * self.channels as usize;
+        let ptr = self.data.as_mut_ptr().add(idx);
+
+        *ptr.add(0) = rgba[0];
+        *ptr.add(1) = rgba[1];
+        *ptr.add(2) = rgba[2];
+        *ptr.add(3) = rgba[3];
+    }
+
+    pub unsafe fn set_rgb_pixel(&mut self, x: u16, y: u16, rgb: [u8; 3]) {
+        let idx = (y as usize * self.width as usize + x as usize) * self.channels as usize;
+        let ptr = self.data.as_mut_ptr().add(idx);
+
+        *ptr.add(0) = rgb[0];
+        *ptr.add(1) = rgb[1];
+        *ptr.add(2) = rgb[2];
+    }
+
+    pub fn apply_patch(
+        &mut self,
+        patch: &Self, // `other` is the patch
+        x: u16,
+        y: u16,
+    ) {
+        assert!(x + patch.width <= self.width);
+        assert!(y + patch.height <= self.height);
+        assert!(self.channels >= 3);
+
+        let use_rgba = self.channels % 2 == 0;
+
+        for j in 0..patch.height {
+            for i in 0..patch.width {
+                if use_rgba {
+                    let s_rgba = self.rgba_pixel(x + i, y + j);
+                    let p_rgba = patch.rgba_pixel(i, j);
+                    let blended = if p_rgba[3] != 255 {
+                        blend_pixel4(s_rgba, p_rgba)
+                    } else {
+                        p_rgba
+                    };
+                    unsafe {
+                        self.set_rgba_pixel(x + i, y + j, blended);
+                    }
+                } else {
+                    let p_rgb = patch.rgb_pixel(i, j);
+                    unsafe {
+                        self.set_rgb_pixel(x + i, y + j, p_rgb);
+                    }
+                }
+            }
+        }
+    }
+
     pub fn apply(self, other: Self) -> Self {
         assert_eq!(self.height, other.height);
         assert_eq!(self.width, other.width);
@@ -79,7 +143,7 @@ impl RawImage {
             for w in 0..self.width {
                 let s_rgba = self.rgba_pixel(w, h);
                 let o_rgba = other.rgba_pixel(w, h);
-                let p = blend_pixel(s_rgba, o_rgba);
+                let p = blend_pixel4(s_rgba, o_rgba);
                 out.push(p);
             }
         }
