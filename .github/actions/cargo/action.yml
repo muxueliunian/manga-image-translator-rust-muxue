@@ -154,7 +154,7 @@ runs:
       run: |
         case "${{ inputs.os }}" in
           linux)
-            cp -u -L target/release/libcudnn.so.9 artifact/
+            cp -u -L target/release/libcudnn.so artifact/libcudnn.so.9
             ;;
         esac
 
