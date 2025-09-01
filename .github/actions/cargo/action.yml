@@ -151,19 +151,10 @@ runs:
 
     - name: Copy ONNX Runtime providers
       shell: bash
-      env:
-        RUNNER_OS: ${{ inputs.os }}
       run: |
-        case "$RUNNER_OS" in
-          windows)
-            pattern="onnxruntime_providers_*.dll"
-            ;;
-          macos)
-            pattern="libonnxruntime_providers_*.dylib"
-            ;;
+        case "${{ inputs.os }}" in
           linux)
             cp -u -L target/release/libcudnn.so.9 artifact/
-            pattern="libonnxruntime_providers_*.so"
             ;;
         esac
 

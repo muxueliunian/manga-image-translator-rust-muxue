@@ -113,41 +113,12 @@ jobs:
       - name: Prepare Release Archives
         shell: bash
         run: |
-          mkdir -p release
-
-          # Define architectures and OSes
-          declare -A bins=(
-            ["linux-x86_64"]="linux-x86_64/simple-runtime"
-            ["linux-arm64"]="linux-arm64/simple-runtime"
-            ["windows-x86_64"]="windows-x86_64/simple-runtime.exe"
-            ["macos-x86_64"]="macos-x86_64/simple-runtime"
-            ["macos-arm64"]="macos-arm64/simple-runtime"
-          )
-
-          for target in "${!bins[@]}"; do
-            bin_path="${bins[$target]}"
-            release_dir="release/manga-image-translator-$target"
-            mkdir -p "$release_dir"
-
-            # Copy main binary
-            cp -- "$bin_path" "$release_dir/$(basename "$bin_path")"
-
-            # Copy dependencies from artifact folder
-            if [ -d artifact ]; then
-              cp -u artifact/* "$release_dir/" || true
+          for target in linux-x86_64 linux-arm64 windows-x86_64 macos-x86_64 macos-arm64; do
+            if [[ "$target" == "windows-x86_64" ]]; then
+              zip -r "manga-image-translator-$target.zip" "$target"/*
+            else
+              tar -C "$target" -czf "manga-image-translator-$target.tar.gz" .
             fi
-
-            # Create tar.gz for Linux/macOS, zip for Windows
-            case "$target" in
-              windows-*)
-                pushd release
-                zip -r "manga-image-translator-$target.zip" "manga-image-translator-$target"
-                popd
-                ;;
-              *)
-                tar -czf "release/manga-image-translator-$target.tar.gz" -C release "manga-image-translator-$target"
-                ;;
-            esac
           done
 
       - name: Create Release

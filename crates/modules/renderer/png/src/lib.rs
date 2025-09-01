@@ -266,6 +266,7 @@ impl PngRenderer {
         let src = src.reshape(4, h as i32).unwrap();
         let mut dst = Mat::default();
         let k = (font_size as f32 / 12.0).ceil() as i32;
+
         gaussian_blur(
             &src,
             &mut dst,
