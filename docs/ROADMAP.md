@@ -12,11 +12,11 @@
   - [x] [windows](https://lib.rs/crates/uni-ocr)
   - [x] [macos](https://lib.rs/crates/uni-ocr)
   - [x] [tesseract](https://lib.rs/crates/uni-ocr)
-  - [ ] [oneocr](https://crates.io/crates/oneocr-rs)
+  - [ ] ~~[oneocr](https://crates.io/crates/oneocr-rs)~~
   - [ ] [paddle](https://github.com/mg-chao/paddle-ocr-rs)
   - [ ] 32px
-  - [ ] 48px
-  - [ ] 48px_ctc
+  - [x] 48px
+  - [x] 48px_ctc
   - [ ] lens_proto
   - [ ] mocr
     - [x] greedy
@@ -37,7 +37,7 @@
   - [ ] [pdf](https://crates.io/crates/oxidize-pdf)
   - [ ] [psd](https://crates.io/crates/psd)
   - [ ] html
-  - [x] png/jpeg/qoi
+  - [~] png/jpeg/qoi
 - [x] upscaler
   - [x] anime4k
   - [x] waifu2x
@@ -68,7 +68,7 @@
 - [ ] optimize code
 - [~] error handling
 - [ ] replace clipper2
-- [ ] replace opencv
+- [ ] ~~replace opencv~~
 - [x] ci
   - [x] cargo build
   - [x] gh publish
