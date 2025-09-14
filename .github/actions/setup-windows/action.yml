@@ -39,7 +39,8 @@ runs:
         $includePath = "C:\tools\opencv\build\include"
 
         echo "Found library: $libName in $libPath"
-
+        $modules = "core,imgproc,calib3d"
         echo "OPENCV_LINK_LIBS=$libName" >> $env:GITHUB_ENV
         echo "OPENCV_LINK_PATHS=+$libPath" >> $env:GITHUB_ENV
         echo "OPENCV_INCLUDE_PATHS=+$includePath" >> $env:GITHUB_ENV
+        echo "OPENCV_MODULES=$modules" >> $env:GITHUB_ENV
