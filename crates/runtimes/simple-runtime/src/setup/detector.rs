@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use base_util::onnx::all_providers;
 use strum::IntoEnumIterator;
@@ -13,16 +13,20 @@ impl Detectors {
     }
     pub fn new() -> Self {
         let mut items = HashMap::new();
+        let providers = Arc::new(all_providers());
         for detector_key in Detector::iter() {
             let detector = match detector_key {
                 Detector::DBNet => {
-                    Box::new(dbnet::DbNetDetector::new(all_providers(), false)) as DetectorType
+                    // allow:clone[arc]
+                    Box::new(dbnet::DbNetDetector::new(providers.clone(), false)) as DetectorType
                 }
                 // Detector::DBNetConvNext => todo!(),
                 Detector::Paddle => {
-                    Box::new(paddle::PaddleDetector::new(all_providers())) as DetectorType
+                    // allow:clone[arc]
+                    Box::new(paddle::PaddleDetector::new(providers.clone())) as DetectorType
                 }
-                Detector::Ctd => Box::new(ctd::CtdDetector::new(all_providers())) as DetectorType,
+                // allow:clone[arc]
+                Detector::Ctd => Box::new(ctd::CtdDetector::new(providers.clone())) as DetectorType,
             };
             items.insert(detector_key, detector);
         }

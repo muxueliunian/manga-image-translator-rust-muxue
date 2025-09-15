@@ -27,9 +27,9 @@ impl MangaOCRModels {
         enc: PathBuf,
         dec: PathBuf,
         vocab: PathBuf,
-        providers: Vec<base_util::onnx::Providers>,
+        providers: &[Providers],
     ) -> anyhow::Result<Self> {
-        let enc = new_session(enc, providers.clone())?;
+        let enc = new_session(enc, providers)?;
         let dec = new_session(dec, providers)?;
 
         let vocab = std::fs::read_to_string(vocab)?
@@ -42,12 +42,12 @@ impl MangaOCRModels {
 
 pub struct MangaOCR {
     models: Option<MangaOCRModels>,
-    providers: Vec<Providers>,
+    providers: Arc<Vec<Providers>>,
     max_length: usize,
 }
 
 impl MangaOCR {
-    pub fn new(providers: Vec<Providers>, max_length: usize) -> Self {
+    pub fn new(providers: Arc<Vec<Providers>>, max_length: usize) -> Self {
         Self {
             models: None,
             providers,
@@ -66,7 +66,7 @@ impl ModelLoad for MangaOCR {
         let enc = self.download_model("enc", "encoder_model.onnx")?;
         let dec = self.download_model("dec", "decoder_model.onnx")?;
         let voc = self.download_model("vocab", "vocab.txt")?;
-        self.models = Some(MangaOCRModels::new(enc, dec, voc, self.providers.clone())?);
+        self.models = Some(MangaOCRModels::new(enc, dec, voc, &self.providers)?);
         Ok(self.models.as_mut().unwrap())
     }
 
@@ -91,47 +91,7 @@ impl Model for MangaOCR {
     }
 }
 
-#[async_trait::async_trait]
-impl interface_ocr::Ocr for MangaOCR {
-    async fn detect(
-        &mut self,
-        image: &Arc<interface_image::RawImage>,
-        areas: &[Arc<Mutex<Quadrilateral>>],
-        img_processor: &Arc<dyn ImageOp + Send + Sync>,
-    ) -> anyhow::Result<Vec<interface_ocr::QuadrilateralInfo>> {
-        let mut texts = vec![];
-        let image = image.clone();
-        let grayscale = spawn_blocking(move || {
-            Arc::new(
-                DynamicImage::from(
-                    RgbImage::from_raw(image.width as u32, image.height as u32, image.data.clone())
-                        .unwrap(),
-                )
-                .to_luma8(),
-            )
-        })
-        .await?;
-        for (index, area) in areas.iter().enumerate() {
-            let bbox = area.lock().aabb();
-            let grayscale = grayscale.clone();
-            let img = tokio::task::spawn_blocking(move || {
-                let view =
-                    grayscale.view(bbox.x as u32, bbox.y as u32, bbox.w as u32, bbox.h as u32);
-                Mask::from(view.to_image())
-            })
-            .await?;
-            img.clone()
-                .to_image()
-                .unwrap()
-                .save(format!("ocr_{index}.png"))
-                .unwrap();
-
-            texts.push(self.detect_patch(img, area.clone(), img_processor).await?);
-        }
-
-        Ok(texts)
-    }
-
+impl MangaOCR {
     async fn detect_patch(
         &mut self,
         image: Mask,
@@ -196,6 +156,47 @@ impl interface_ocr::Ocr for MangaOCR {
         })
     }
 }
+#[async_trait::async_trait]
+impl interface_ocr::Ocr for MangaOCR {
+    async fn detect(
+        &mut self,
+        image: &Arc<interface_image::RawImage>,
+        areas: &[Arc<Mutex<Quadrilateral>>],
+        img_processor: &Arc<dyn ImageOp + Send + Sync>,
+    ) -> anyhow::Result<Vec<interface_ocr::QuadrilateralInfo>> {
+        let mut texts = vec![];
+        let image = image.clone();
+        let grayscale = spawn_blocking(move || {
+            Arc::new(
+                DynamicImage::from(
+                    RgbImage::from_raw(image.width as u32, image.height as u32, image.data.clone())
+                        .unwrap(),
+                )
+                .to_luma8(),
+            )
+        })
+        .await?;
+        for (index, area) in areas.iter().enumerate() {
+            let bbox = area.lock().aabb();
+            let grayscale = grayscale.clone();
+            let img = tokio::task::spawn_blocking(move || {
+                let view =
+                    grayscale.view(bbox.x as u32, bbox.y as u32, bbox.w as u32, bbox.h as u32);
+                Mask::from(view.to_image())
+            })
+            .await?;
+            img.clone()
+                .to_image()
+                .unwrap()
+                .save(format!("ocr_{index}.png"))
+                .unwrap();
+
+            texts.push(self.detect_patch(img, area.clone(), img_processor).await?);
+        }
+
+        Ok(texts)
+    }
+}
 
 async fn preprocessor(
     mut img: Mask,
@@ -234,7 +235,7 @@ mod tests {
     async fn ocr_test() {
         let img = RawImage::new("./imgs/232265329-6a560438-e887-4f7f-b6a1-a61b8648f781.png")
             .expect("Failed to load image");
-        let mut mocr = MangaOCR::new(all_providers(), 255);
+        let mut mocr = MangaOCR::new(Arc::new(all_providers()), 255);
         let inp = vec![
             Arc::new(Mutex::new(Quadrilateral::new(
                 vec![(208, 4), (246, 4), (246, 192), (208, 192)],

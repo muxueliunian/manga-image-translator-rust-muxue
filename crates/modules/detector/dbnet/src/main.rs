@@ -10,7 +10,7 @@ use interface_model::ModelLoad;
 
 fn main() {
     env_logger::init();
-    let mut data = DbNetDetector::new(all_providers(), false);
+    let mut data = DbNetDetector::new(Arc::new(all_providers()), false);
     let cpu_image_processor =
         Arc::new(CpuImageProcessor::default()) as Arc<dyn ImageOp + Send + Sync>;
     data.load().expect("Failed to load data");

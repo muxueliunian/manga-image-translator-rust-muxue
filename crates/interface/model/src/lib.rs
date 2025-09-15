@@ -1,9 +1,7 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::db::ModelDb;
 use anyhow::anyhow;
-#[cfg(feature = "onnx")]
-use base_util::onnx::{all_providers, Providers};
 
 pub mod db;
 
@@ -54,37 +52,6 @@ macro_rules! impl_model_load_helpers {
             $kind
         }
     };
-}
-
-#[derive(Clone)]
-pub struct CreateData {
-    pub mode_db: Arc<ModelDb>,
-    #[cfg(feature = "onnx")]
-    pub providers: Vec<Providers>,
-}
-
-impl CreateData {
-    pub fn all() -> Self {
-        Self {
-            mode_db: Arc::new(ModelDb {}),
-            #[cfg(feature = "onnx")]
-            providers: all_providers(),
-        }
-    }
-
-    #[cfg(feature = "onnx")]
-    pub fn new(providers: Vec<Providers>) -> Self {
-        Self {
-            mode_db: Arc::new(ModelDb {}),
-            providers,
-        }
-    }
-    #[cfg(not(feature = "onnx"))]
-    pub fn new() -> Self {
-        Self {
-            mode_db: Arc::new(ModelDb {}),
-        }
-    }
 }
 
 pub struct ModelSource {

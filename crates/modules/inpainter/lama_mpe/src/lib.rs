@@ -1,8 +1,8 @@
 mod mpe;
-use std::{ops::Deref, sync::Arc};
+use std::sync::Arc;
 
 use base_util::onnx::{new_session, Providers};
-use interface_image::{ImageOp, RawImage, RawImageCow};
+use interface_image::{ImageOp, RawImageCow};
 use interface_inpainter::{Inpainter, InpainterOptions};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use maplit::hashmap;
@@ -12,11 +12,11 @@ use util::lama::{lama_add_border, lama_resize_image};
 
 pub struct LamaLargeInpainter {
     model: Option<Session>,
-    providers: Vec<Providers>,
+    providers: Arc<Vec<Providers>>,
 }
 
 impl LamaLargeInpainter {
-    pub fn new(providers: Vec<Providers>) -> Self {
+    pub fn new(providers: Arc<Vec<Providers>>) -> Self {
         Self {
             model: None,
             providers,
@@ -38,7 +38,7 @@ impl ModelLoad for LamaLargeInpainter {
     fn reload(&mut self) -> anyhow::Result<&mut Self::T> {
         self.model = Some(new_session(
             self.download_model("model", "model.onnx")?,
-            self.providers.clone(),
+            &self.providers,
         )?);
         Ok(self.model.as_mut().unwrap())
     }
@@ -65,12 +65,10 @@ impl Inpainter for LamaLargeInpainter {
     ) -> anyhow::Result<interface_image::RawImage> {
         let ho = image.height;
         let wo = image.width;
-        let (mut image, mask) = lama_resize_image(
-            image.deref().clone(),
-            mask,
-            options.inpainting_size,
-            img_processor,
-        )?;
+        let (image, mask) =
+            lama_resize_image(image.view(), mask, options.inpainting_size, img_processor)?;
+        let mut image = image.to_owned();
+
         let h = image.height;
         let w = image.width;
         image = interface_inpainter::remove_mask_area(image, &mask);
@@ -123,7 +121,7 @@ impl Inpainter for LamaLargeInpainter {
 mod tests {
     use std::sync::Arc;
 
-    use interface_image::{CpuImageProcessor, Mask};
+    use interface_image::{CpuImageProcessor, Mask, RawImage};
     use ndarray::Array2;
 
     use super::*;
@@ -137,7 +135,7 @@ mod tests {
             Arc::new(CpuImageProcessor::default()) as Arc<dyn ImageOp + Send + Sync>;
         let mask: Array2<u8> = ndarray_npy::read_npy("../lama_large/mask.npy").unwrap();
         let mask = Mask::from(mask);
-        let mut inp = LamaLargeInpainter::new(vec![]);
+        let mut inp = LamaLargeInpainter::new(Default::default());
         let v = inp
             .inpaint(&Arc::new(img), mask, Default::default(), &img_processor)
             .unwrap();

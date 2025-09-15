@@ -519,6 +519,7 @@ mod tests {
     #[test]
     fn test_quadrilateral_new_and_accessors() {
         let points = vec![(0, 0), (10, 0), (10, 1), (0, 1)];
+        // allow:clone[test]
         let quad = Quadrilateral::new(points.clone(), 0.9);
 
         assert_eq!(

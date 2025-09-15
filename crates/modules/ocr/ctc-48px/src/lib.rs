@@ -18,11 +18,11 @@ use util::{
 
 pub struct Ctc48pxOcr {
     model: Option<(Session, Vec<String>)>,
-    providers: Vec<Providers>,
+    providers: Arc<Vec<Providers>>,
 }
 
 impl Ctc48pxOcr {
-    pub fn new(providers: Vec<Providers>) -> Self {
+    pub fn new(providers: Arc<Vec<Providers>>) -> Self {
         Self {
             model: None,
             providers,
@@ -63,7 +63,7 @@ impl ModelLoad for Ctc48pxOcr {
             .lines()
             .map(|v| v.trim_end().to_string())
             .collect::<Vec<String>>();
-        let model = new_session(model, self.providers.clone())?;
+        let model = new_session(model, &self.providers)?;
 
         self.model = Some((model, dict));
         Ok(self.model.as_mut().unwrap())
@@ -200,16 +200,6 @@ impl Ocr for Ctc48pxOcr {
         }
         Ok(out)
     }
-
-    /// image is already the sliced image
-    async fn detect_patch(
-        &mut self,
-        _: Mask,
-        _: Arc<Mutex<Quadrilateral>>,
-        _: &Arc<dyn ImageOp + Send + Sync>,
-    ) -> anyhow::Result<QuadrilateralInfo> {
-        todo!()
-    }
 }
 
 #[cfg(test)]
@@ -228,7 +218,7 @@ mod tests {
     async fn ocr_test() {
         let img = RawImage::new("./imgs/232265329-6a560438-e887-4f7f-b6a1-a61b8648f781.png")
             .expect("Failed to load image");
-        let mut mocr = Ctc48pxOcr::new(all_providers());
+        let mut mocr = Ctc48pxOcr::new(Arc::new(all_providers()));
         let inp = vec![
             Arc::new(Mutex::new(Quadrilateral::new(
                 vec![(208, 4), (246, 4), (246, 192), (208, 192)],

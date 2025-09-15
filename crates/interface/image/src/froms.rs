@@ -1,5 +1,5 @@
 use image::{DynamicImage, GrayImage};
-use ndarray::{Array2, Array3, ArrayView2};
+use ndarray::{Array2, Array3};
 use opencv::core::{Mat, MatTraitConst as _};
 
 use crate::{DimType, Mask, RawImage};
@@ -20,6 +20,7 @@ impl TryFrom<Mat> for RawImage {
         let resized = if value.is_continuous() {
             value
         } else {
+            // allow:clone[to_contiguous]
             value.clone()
         };
 
@@ -29,6 +30,7 @@ impl TryFrom<Mat> for RawImage {
         let channels = resized.channels() as usize;
 
         let total_len = rows * cols * channels;
+        //TODO: take data instead of copy
         let data: &[u8] = unsafe { std::slice::from_raw_parts(resized.data(), total_len) };
 
         Ok(Self {
@@ -69,6 +71,7 @@ impl From<Array2<u8>> for RawImage {
             .broadcast((mask.shape()[0], mask.shape()[1], 3))
             .unwrap()
             .to_owned();
+        assert!(rgb.is_standard_layout());
         let (v, offset) = rgb.into_raw_vec_and_offset();
         assert_eq!(offset.unwrap_or_default(), 0);
 
@@ -86,6 +89,7 @@ impl From<Mat> for Mask {
         let resized = if value.is_continuous() {
             value
         } else {
+            // allow:clone[to_contiguous]
             value.clone()
         };
 
@@ -97,6 +101,7 @@ impl From<Mat> for Mask {
         assert_eq!(channels, 1);
 
         let total_len = rows * cols * channels;
+        //TODO: take data instead of cloning
         let data: &[u8] = unsafe { std::slice::from_raw_parts(resized.data(), total_len) };
 
         Self {
@@ -117,68 +122,14 @@ impl From<GrayImage> for Mask {
         }
     }
 }
-impl From<&GrayImage> for Mask {
-    fn from(value: &GrayImage) -> Self {
-        let (w, h) = value.dimensions();
-        Mask {
-            width: w as DimType,
-            height: h as DimType,
-            data: value.as_raw().clone(),
-        }
-    }
-}
-
-impl From<&Array2<u8>> for Mask {
-    fn from(mask: &Array2<u8>) -> Self {
-        let (height, width) = mask.dim();
-
-        let (v, offset) = mask.to_owned().into_raw_vec_and_offset();
-        assert_eq!(offset.unwrap_or_default(), 0);
-
-        Mask {
-            data: v,
-            width: width as u16,
-            height: height as u16,
-        }
-    }
-}
-
-impl From<ArrayView2<'_, u8>> for Mask {
-    fn from(mask: ArrayView2<'_, u8>) -> Self {
-        let (height, width) = mask.dim();
-
-        let (v, offset) = mask.to_owned().into_raw_vec_and_offset();
-        assert_eq!(offset.unwrap_or_default(), 0);
-
-        Mask {
-            data: v,
-            width: width as u16,
-            height: height as u16,
-        }
-    }
-}
-
-impl From<&ArrayView2<'_, u8>> for Mask {
-    fn from(mask: &ArrayView2<'_, u8>) -> Self {
-        let (height, width) = mask.dim();
-
-        let (v, offset) = mask.to_owned().into_raw_vec_and_offset();
-        assert_eq!(offset.unwrap_or_default(), 0);
-
-        Mask {
-            data: v,
-            width: width as u16,
-            height: height as u16,
-        }
-    }
-}
 
 impl From<Array2<u8>> for Mask {
     fn from(mut mask: Array2<u8>) -> Self {
         let (height, width) = mask.dim();
-        if mask.as_slice().is_none() {
-            mask = mask.to_owned();
+        if !mask.is_standard_layout() {
+            mask = mask.as_standard_layout().to_owned();
         }
+
         let (v, offset) = mask.into_raw_vec_and_offset();
         assert_eq!(offset.unwrap_or_default(), 0);
 
@@ -194,8 +145,8 @@ impl From<Array3<u8>> for RawImage {
     fn from(mut value: Array3<u8>) -> Self {
         let (height, width, channels) = value.dim();
 
-        if value.as_slice().is_none() {
-            value = value.to_owned();
+        if !value.is_standard_layout() {
+            value = value.as_standard_layout().to_owned();
         }
         let (v, offset) = value.into_raw_vec_and_offset();
         assert_eq!(offset.unwrap_or_default(), 0);

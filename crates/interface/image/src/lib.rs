@@ -6,14 +6,10 @@ use std::{
 mod cpu;
 pub mod dummy;
 mod froms;
-#[cfg(feature = "gpu")]
-mod gpu;
 mod rayon;
 
 use base_util::ndarray_utils;
 pub use cpu::CpuImageProcessor;
-#[cfg(feature = "gpu")]
-pub use gpu::GpuImageProcessor;
 use image::{DynamicImage, RgbaImage};
 use ndarray::{Array2, ArrayView, ArrayView2, ArrayView3, Dim};
 use opencv::{
@@ -105,12 +101,6 @@ impl<'a> From<ArrayView3<'a, u8>> for RawImageCow<'a> {
 }
 
 impl RawImageCow<'_> {
-    pub fn resolve(self, orig: RawImage) -> RawImage {
-        match self {
-            RawImageCow::Borrowed(_) => orig,
-            RawImageCow::Owned(image) => image,
-        }
-    }
     pub fn view(&self) -> RawImageView {
         match self {
             RawImageCow::Borrowed(view) => *view,
@@ -398,6 +388,64 @@ pub struct Mask {
     pub data: Vec<u8>,
 }
 
+#[derive(Clone, Copy)]
+pub struct MaskView<'a> {
+    pub width: DimType,
+    pub height: DimType,
+    pub data: &'a [u8],
+}
+
+pub enum MaskCow<'a> {
+    Owned(Mask),
+    Borrowed(MaskView<'a>),
+}
+
+impl MaskCow<'_> {
+    pub fn view(&self) -> MaskView<'_> {
+        match self {
+            MaskCow::Borrowed(view) => *view,
+            MaskCow::Owned(image) => image.view(),
+        }
+    }
+}
+
+impl<'a> MaskView<'a> {
+    pub fn as_opencv_mat(&self) -> Result<BoxedRef<'a, Mat>, opencv::Error> {
+        let mat = Mat::from_slice(self.data)?;
+        let mat = mat.reshape(1, self.height as i32)?;
+        let mat: BoxedRef<'a, Mat> = unsafe { std::mem::transmute(mat) };
+        Ok(mat)
+    }
+}
+
+impl Mask {
+    pub fn view<'a>(&'a self) -> MaskView<'a> {
+        MaskView {
+            width: self.width,
+            height: self.height,
+            data: &self.data,
+        }
+    }
+}
+
+impl<'a> From<ArrayView2<'a, u8>> for MaskCow<'a> {
+    fn from(img: ArrayView2<'a, u8>) -> Self {
+        let shape = img.shape();
+        match ndarray_utils::as_slice(img) {
+            std::borrow::Cow::Borrowed(b) => MaskCow::Borrowed(MaskView {
+                data: b,
+                width: shape[1] as DimType,
+                height: shape[0] as DimType,
+            }),
+            std::borrow::Cow::Owned(o) => MaskCow::Owned(Mask {
+                data: o,
+                width: shape[1] as DimType,
+                height: shape[0] as DimType,
+            }),
+        }
+    }
+}
+
 impl Mask {
     pub fn new(path: &str) -> anyhow::Result<Self> {
         let path = PathBuf::from(path);
@@ -415,12 +463,14 @@ impl Mask {
     pub fn get(&self, x: usize, y: usize) -> u8 {
         self.data[x + y * self.width as usize]
     }
+
     pub fn as_opencv_mat<'a>(&'a self) -> Result<BoxedRef<'a, Mat>, opencv::Error> {
         let mat = Mat::from_slice(&self.data)?;
         let mat = mat.reshape(1, self.height as i32)?;
         let mat: BoxedRef<'a, Mat> = unsafe { std::mem::transmute(mat) };
         Ok(mat)
     }
+
     pub fn as_opencv_mut_mat<'a>(&'a mut self) -> Result<BoxedRefMut<'a, Mat>, opencv::Error> {
         let mut mat = Mat::from_slice_mut(&mut self.data)?;
         let mat = mat.reshape_mut(1, self.height as i32)?;
@@ -439,84 +489,6 @@ impl Mask {
             (self.height as usize, self.width as usize),
             self.data,
         )?)
-    }
-}
-
-#[cfg(feature = "debug")]
-impl RawImage {
-    pub fn draw_bbox(&mut self, textlines: &[Quadrilateral]) -> Result<(), &'static str> {
-        use tiny_skia::{Color, Paint, Pixmap, Stroke};
-
-        let rgb_img = self
-            .clone()
-            .to_image()
-            .ok_or("Failed to convert to image")?;
-        let mut pixmap =
-            Pixmap::new(self.width as u32, self.height as u32).ok_or("Failed to create Pixmap")?;
-
-        for (x, y, pixel) in rgb_img.enumerate_pixels() {
-            let i = (y * self.width as u32 + x) as usize;
-            let r = pixel[0];
-            let g = pixel[1];
-            let b = pixel[2];
-            pixmap.pixels_mut()[i] = tiny_skia::PremultipliedColorU8::from_rgba(r, g, b, 255)
-                .expect("Alpha needs to be >= rgb");
-        }
-
-        let mut paint = Paint::default();
-        paint.set_color(
-            Color::from_rgba(1.0, 0.0, 0.0, 1.0)
-                .expect("rbga values need to be in range from 0 to 1"),
-        );
-        let stroke = Stroke {
-            width: 2.0,
-            ..Default::default()
-        };
-
-        for txt in textlines {
-            use tiny_skia::PathBuilder;
-
-            let mut pb = PathBuilder::new();
-            if let Some(&(x0, y0)) = txt.pts().first() {
-                pb.move_to(x0 as f32, y0 as f32);
-                for &(x, y) in &txt.pts()[1..] {
-                    pb.line_to(x as f32, y as f32);
-                }
-                pb.close();
-                let path = pb.finish().ok_or("invalid path")?;
-                pixmap.stroke_path(
-                    &path,
-                    &paint,
-                    &stroke,
-                    tiny_skia::Transform::identity(),
-                    None,
-                );
-            }
-        }
-        self.data = pixmap
-            .data()
-            .chunks(4)
-            .flat_map(|v| &v[..3])
-            .cloned()
-            .collect();
-        Ok(())
-    }
-
-    pub fn display(&self) -> anyhow::Result<()> {
-        use show_image::{create_window, ImageView};
-        let window = create_window("Image", Default::default())?;
-
-        let image = ImageView::new(
-            show_image::ImageInfo::rgb8(self.width as u32, self.height as u32),
-            &self.data,
-        );
-
-        window.set_image("frame-0", image)?;
-
-        println!("Press Enter to close the window...");
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
-        Ok(())
     }
 }
 

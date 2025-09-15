@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use interface_image::{DimType, ImageOp, Mask, RawImage, RawImageCow};
+use interface_image::{DimType, ImageOp, Mask, RawImage, RawImageCow, RawImageView};
 
 pub fn resize_keep_aspect(
-    img: RawImage,
+    img: RawImageView,
     size: u16,
     img_processor: &Arc<dyn ImageOp + Send + Sync>,
 ) -> anyhow::Result<RawImage> {
@@ -12,7 +12,7 @@ pub fn resize_keep_aspect(
     let new_height = img.height as f64 * ratio;
 
     img_processor.resize(
-        img.view(),
+        img,
         new_width as DimType,
         new_height as DimType,
         interface_image::Interpolation::BilinearExact,
@@ -36,16 +36,21 @@ pub fn resize_keep_aspect_mask(
     )
 }
 
-pub fn lama_resize_image(
-    mut image: RawImage,
+pub fn lama_resize_image<'a>(
+    image: RawImageView<'a>,
     mut mask: Mask,
     inpainting_size: u16,
     img_processor: &Arc<dyn ImageOp + Send + Sync>,
-) -> anyhow::Result<(RawImage, Mask)> {
+) -> anyhow::Result<(RawImageCow<'a>, Mask)> {
     let w = image.width;
     let h = image.height;
+    let mut image = RawImageCow::Borrowed(image);
     if w.max(h) > inpainting_size {
-        image = resize_keep_aspect(image, inpainting_size, img_processor)?;
+        image = RawImageCow::Owned(resize_keep_aspect(
+            image.view(),
+            inpainting_size,
+            img_processor,
+        )?);
         mask = resize_keep_aspect_mask(mask, inpainting_size, img_processor)?;
     }
     Ok((image, mask))

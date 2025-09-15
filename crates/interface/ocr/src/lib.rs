@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use interface_detector::textlines::Quadrilateral;
-use interface_image::{ImageOp, Mask, RawImage};
+use interface_image::{ImageOp, RawImage};
 use parking_lot::Mutex;
 
 #[async_trait::async_trait]
@@ -12,14 +12,6 @@ pub trait Ocr {
         areas: &[Arc<Mutex<Quadrilateral>>],
         img_processor: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<Vec<QuadrilateralInfo>>;
-
-    /// image is already the sliced image
-    async fn detect_patch(
-        &mut self,
-        sliced_image: Mask,
-        area: Arc<Mutex<Quadrilateral>>,
-        img_processor: &Arc<dyn ImageOp + Send + Sync>,
-    ) -> anyhow::Result<QuadrilateralInfo>;
 }
 
 #[derive(Debug, Clone)]

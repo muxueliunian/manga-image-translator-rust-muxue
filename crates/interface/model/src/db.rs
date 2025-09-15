@@ -27,6 +27,7 @@ impl ModelDb {
 
         std::fs::create_dir_all(file_path.parent().expect("set above"))?;
         let mut folder = false;
+        // allow:clone[pathbuf]
         let ret_file_path = file_path.clone();
         if file.contains("/") {
             file_path = file_path.parent().expect("set above").to_path_buf();
@@ -272,6 +273,7 @@ fn download_and_extract(url: &str, file_path: &Path, folder: bool) -> anyhow::Re
     let b = b.as_reader();
     let mut progress_reader = ProgressReader {
         inner: b,
+        // allow:clone[arc]
         progress_bar: pb.clone(),
         bytes_read: 0,
     };

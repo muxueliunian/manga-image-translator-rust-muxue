@@ -18,7 +18,7 @@ use util::{
 use maplit::hashmap;
 
 pub struct DbNetDetector {
-    providers: Vec<Providers>,
+    providers: Arc<Vec<Providers>>,
     model: Option<Session>,
     /// Different model architecture, but based on dbnet
     convnext: bool,
@@ -26,7 +26,7 @@ pub struct DbNetDetector {
 
 impl DbNetDetector {
     ///convnext: Different model architecture, but based on dbnet
-    pub fn new(providers: Vec<Providers>, convnext: bool) -> Self {
+    pub fn new(providers: Arc<Vec<Providers>>, convnext: bool) -> Self {
         DbNetDetector {
             providers,
             model: None,
@@ -43,7 +43,7 @@ impl ModelLoad for DbNetDetector {
     fn reload(&mut self) -> anyhow::Result<&mut Session> {
         self.model = Some(new_session(
             self.download_model("model", "model.onnx")?,
-            self.providers.clone(),
+            &self.providers,
         )?);
         Ok(self.model.as_mut().unwrap())
     }
@@ -256,14 +256,14 @@ mod tests {
 
     #[test]
     fn load_unload() {
-        let mut data = DbNetDetector::new(all_providers(), false);
+        let mut data = DbNetDetector::new(Arc::new(all_providers()), false);
         data.load().expect("failed to load model");
         data.unload();
     }
 
     #[test]
     fn run() {
-        let mut data = DbNetDetector::new(all_providers(), false);
+        let mut data = DbNetDetector::new(Arc::new(all_providers()), false);
         let cpu_image_processor =
             Arc::new(CpuImageProcessor::default()) as Arc<dyn ImageOp + Send + Sync>;
         data.load().expect("Failed to load data");

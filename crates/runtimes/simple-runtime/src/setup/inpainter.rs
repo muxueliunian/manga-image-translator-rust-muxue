@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use base_util::onnx::gpu_providers;
 use strum::IntoEnumIterator;
@@ -15,17 +15,20 @@ impl Inpainters {
     }
     pub fn new() -> Self {
         let mut items = HashMap::new();
-        let providers = gpu_providers();
+        let providers = Arc::new(gpu_providers());
         for key in Inpainter::iter() {
             let inpainter = match key {
                 Inpainter::LamaAot => {
+                    // allow:clone
                     Box::new(lama_aot::LamaLargeInpainter::new(providers.clone())) as InpainterType
                 }
                 Inpainter::LamaLarge => {
+                    // allow:clone
                     Box::new(lama_large::LamaLargeInpainter::new(providers.clone()))
                         as InpainterType
                 }
                 Inpainter::LamaMpe => {
+                    // allow:clone
                     Box::new(lama_mpe::LamaLargeInpainter::new(providers.clone())) as InpainterType
                 }
             };

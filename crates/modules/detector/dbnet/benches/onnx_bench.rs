@@ -11,7 +11,7 @@ use interface_model::Model;
 use interface_model::ModelLoad;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut data = DbNetDetector::new(all_providers(), false);
+    let mut data = DbNetDetector::new(Arc::new(all_providers()), false);
     let img = RawImage::new("./imgs/232264684-5a7bcf8e-707b-4925-86b0-4212382f1680.png")
         .expect("Failed to load image");
     let cpu_image_processor =

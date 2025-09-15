@@ -89,7 +89,9 @@ impl Ocr for TesseractOCR {
 
         Ok(texts)
     }
+}
 
+impl TesseractOCR {
     async fn detect_patch(
         &mut self,
         sliced_image: interface_image::Mask,

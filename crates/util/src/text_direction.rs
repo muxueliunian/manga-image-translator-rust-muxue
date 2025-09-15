@@ -38,6 +38,7 @@ pub fn generate_text_direction(
 ) -> impl Iterator<Item = (Arc<parking_lot::Mutex<Quadrilateral>>, bool)> {
     let mut graph: Graph<Arc<parking_lot::Mutex<Quadrilateral>>, (), petgraph::Undirected> =
         Graph::new_undirected();
+    // allow:clone[arc]
     for bbox in bboxes.clone() {
         graph.add_node(bbox);
     }
@@ -72,6 +73,7 @@ pub fn generate_text_direction(
                     let aabb = graph[node].lock().aabb();
                     -(aabb.x + aabb.w)
                 })
+                // allow:clone[arc]
                 .map(|node| (graph[node].clone(), majority_vertical))
                 .collect::<Vec<_>>()
                 .into_iter()
@@ -82,6 +84,7 @@ pub fn generate_text_direction(
                     let aabb = graph[node].lock().aabb();
                     aabb.y + aabb.h / 2
                 })
+                // allow:clone[arc]
                 .map(|node| (graph[node].clone(), majority_vertical))
                 .collect::<Vec<_>>()
                 .into_iter()

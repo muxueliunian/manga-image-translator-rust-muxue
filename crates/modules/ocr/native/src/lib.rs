@@ -86,10 +86,11 @@ impl Ocr for NativeOCR {
 
             texts.push(self.detect_patch(img, area.clone(), img_processor).await?);
         }
-
         Ok(texts)
     }
+}
 
+impl NativeOCR {
     async fn detect_patch(
         &mut self,
         sliced_image: interface_image::Mask,

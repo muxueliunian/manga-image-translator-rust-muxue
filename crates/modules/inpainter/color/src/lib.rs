@@ -55,6 +55,7 @@ impl Inpainter for ColorInpainter {
         _: &Arc<dyn interface_image::ImageOp + Send + Sync>,
     ) -> anyhow::Result<interface_image::RawImage> {
         Ok(colorize_mask_area(
+            // allow:clone[change inplace]
             image.deref().clone(),
             &mask,
             options.color,

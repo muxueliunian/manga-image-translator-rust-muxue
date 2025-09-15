@@ -5,14 +5,13 @@ use std::{fs::read_to_string, ops::Deref, sync::Arc};
 
 use base_util::onnx::{new_session, Providers};
 use interface_detector::textlines::Quadrilateral;
-use interface_image::{ImageOp, Mask, RawImage};
+use interface_image::{ImageOp, RawImage};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use interface_ocr::{Ocr, QuadrilateralInfo};
 use maplit::hashmap;
 use ndarray::{s, Array4};
 use opencv::core::{MatTraitConst as _, MatTraitConstManual};
 use ort::session::Session;
-use parking_lot::Mutex;
 use util::{
     average::AvgMeter, resize::get_transformed_region, text_direction::generate_text_direction,
 };
@@ -66,9 +65,9 @@ impl ModelLoad for Ocr48px {
             .lines()
             .map(|v| v.trim_end().to_string())
             .collect::<Vec<String>>();
-        let encoder = new_session(encoder, self.providers.clone())?;
-        let color_pred = new_session(color_pred, self.providers.clone())?;
-        let decoder = new_session(decoder, self.providers.clone())?;
+        let encoder = new_session(encoder, &self.providers)?;
+        let color_pred = new_session(color_pred, &self.providers)?;
+        let decoder = new_session(decoder, &self.providers)?;
 
         self.model = Some(((encoder, decoder, color_pred), dict));
         Ok(self.model.as_mut().unwrap())
@@ -242,16 +241,6 @@ impl Ocr for Ocr48px {
             }
         }
         Ok(out)
-    }
-
-    /// image is already the sliced image
-    async fn detect_patch(
-        &mut self,
-        _: Mask,
-        _: Arc<Mutex<Quadrilateral>>,
-        _: &Arc<dyn ImageOp + Send + Sync>,
-    ) -> anyhow::Result<QuadrilateralInfo> {
-        todo!()
     }
 }
 

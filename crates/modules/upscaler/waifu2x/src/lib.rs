@@ -14,7 +14,7 @@ pub struct Waifu2xUpscaler {
     model: Option<Session>,
     model_kind: Waifu2xModels,
     max_batch_size: usize,
-    providers: Vec<Providers>,
+    providers: Arc<Vec<Providers>>,
 }
 
 impl Display for Waifu2xModels {
@@ -84,7 +84,11 @@ impl Waifu2xModels {
 }
 
 impl Waifu2xUpscaler {
-    pub fn new(model: Waifu2xModels, max_batch_size: usize, providers: Vec<Providers>) -> Self {
+    pub fn new(
+        model: Waifu2xModels,
+        max_batch_size: usize,
+        providers: Arc<Vec<Providers>>,
+    ) -> Self {
         Self {
             model: None,
             model_kind: model,
@@ -103,7 +107,7 @@ impl ModelLoad for Waifu2xUpscaler {
     fn reload(&mut self) -> anyhow::Result<&mut Session> {
         let model = self.model_kind.to_string();
         let path = self.download_model(&model, &format!("{model}.onnx"))?;
-        let session = new_session(path, self.providers.clone())?;
+        let session = new_session(path, &self.providers)?;
         self.model = Some(session);
         Ok(self.model.as_mut().expect("Set model before"))
     }
@@ -175,7 +179,7 @@ mod tests {
         let mut upscaler = Waifu2xUpscaler::new(
             Waifu2xModels::CuNetArt { noise: Some(3) },
             5,
-            all_providers(),
+            Arc::new(all_providers()),
         );
         let image = RawImage::url(
             "https://github.com/xinntao/Real-ESRGAN/blob/master/inputs/0014.jpg?raw=true",
@@ -206,7 +210,7 @@ mod tests {
         let mut upscaler = Waifu2xUpscaler::new(
             Waifu2xModels::CuNetArt { noise: Some(3) },
             5,
-            all_providers(),
+            Arc::new(all_providers()),
         );
         let image = RawImage::url(
             "https://github.com/xinntao/Real-ESRGAN/blob/master/inputs/0014.jpg?raw=true",

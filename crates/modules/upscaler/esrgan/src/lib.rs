@@ -15,7 +15,7 @@ pub struct EsrGan {
     model: Option<Session>,
     model_kind: EsrGanModel,
     max_batch_size: usize,
-    providers: Vec<Providers>,
+    providers: Arc<Vec<Providers>>,
 }
 
 pub enum EsrGanModel {
@@ -58,7 +58,7 @@ impl Display for EsrGanModel {
     }
 }
 impl EsrGan {
-    pub fn new(model: EsrGanModel, max_batch_size: usize, providers: Vec<Providers>) -> Self {
+    pub fn new(model: EsrGanModel, max_batch_size: usize, providers: Arc<Vec<Providers>>) -> Self {
         Self {
             model: None,
             model_kind: model,
@@ -77,7 +77,7 @@ impl ModelLoad for EsrGan {
     fn reload(&mut self) -> anyhow::Result<&mut Session> {
         let model = self.model_kind.to_string();
         let path = self.download_model(&model, &format!("{model}.onnx"))?;
-        let session = new_session(path, self.providers.clone())?;
+        let session = new_session(path, &self.providers)?;
         self.model = Some(session);
 
         Ok(self.model.as_mut().expect("Set model before"))
@@ -258,7 +258,11 @@ mod tests {
 
     #[test]
     fn test_upscaler() {
-        let mut upscaler = EsrGan::new(EsrGanModel::X2Plus { f32: true }, 5, all_providers());
+        let mut upscaler = EsrGan::new(
+            EsrGanModel::X2Plus { f32: true },
+            5,
+            Arc::new(all_providers()),
+        );
         let image = RawImage::url(
             "https://github.com/xinntao/Real-ESRGAN/blob/master/inputs/0014.jpg?raw=true",
         )
@@ -282,7 +286,7 @@ mod tests {
         let mut upscaler = EsrGan::new(
             EsrGanModel::X4PlusAnime6B { f32: false },
             5,
-            all_providers(),
+            Arc::new(all_providers()),
         );
         let image = RawImage::url(
             "https://github.com/xinntao/Real-ESRGAN/blob/master/inputs/0014.jpg?raw=true",

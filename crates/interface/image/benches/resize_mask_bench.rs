@@ -6,12 +6,14 @@ fn bench_resize_cpu(
     image: &mut Mask,
     interpolation: Interpolation,
 ) {
-    processor.resize_mask(
-        image,
-        image.width as usize * 2,
-        image.height as usize * 2,
-        interpolation,
-    );
+    processor
+        .resize_mask(
+            image,
+            image.width as usize * 2,
+            image.height as usize * 2,
+            interpolation,
+        )
+        .unwrap();
 }
 
 fn bench_resize_rayon(
@@ -19,12 +21,14 @@ fn bench_resize_rayon(
     image: &mut Mask,
     interpolation: Interpolation,
 ) {
-    processor.resize_mask(
-        image,
-        image.width as usize * 2,
-        image.height as usize * 2,
-        interpolation,
-    );
+    processor
+        .resize_mask(
+            image,
+            image.width as usize * 2,
+            image.height as usize * 2,
+            interpolation,
+        )
+        .unwrap();
 }
 
 #[cfg(feature = "gpu")]

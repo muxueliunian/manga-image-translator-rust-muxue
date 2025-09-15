@@ -5,7 +5,7 @@ use imageproc::{
 };
 
 use interface_detector::textlines::Quadrilateral;
-use interface_image::{Mask, RawImage, RawImageCow};
+use interface_image::{Mask, MaskCow, RawImage, RawImageCow};
 use ndarray::{s, Array2, ArrayView2, Zip};
 use opencv::{
     core::{
@@ -44,7 +44,7 @@ pub fn refine_mask(
         let msk = msk.slice(s![by1 as usize..by2 as usize, bx1 as usize..bx2 as usize]);
         let mut mask_list = get_topk_masklist(im_gray, &msk)?;
         mask_list.extend(get_otsuthresh_masklist(&RawImage::from(im), msk)?);
-        let mask_merged = merge_mask_list(mask_list, &Mask::from(msk), 30, refinemask_inpaint)?;
+        let mask_merged = merge_mask_list(mask_list, &MaskCow::from(msk), 30, refinemask_inpaint)?;
         let roi_rect = Rect::new(
             bx1 as i32,
             by1 as i32,
@@ -103,8 +103,8 @@ fn get_topk_masklist(
             let c_top = 255.min(color + color_range);
             let c_bottom = c_top as i64 - 2 * color_range as i64;
             let mut threshed = Mat::default();
-            let im_grey = Mask::from(&im_grey);
-            let im_grey = im_grey.as_opencv_mat()?;
+            let im_grey = MaskCow::from(im_grey.view());
+            let im_grey = im_grey.view().as_opencv_mat()?;
 
             in_range(
                 &im_grey,
@@ -207,22 +207,20 @@ fn merge_mask_list_(
 
     let roi_mask_merged = Mat::roi(mask_merged, roi_rect)?;
     let roi_pred_mask = Mat::roi(pred_mask, roi_rect)?;
-    let mut roi_tmp_merged = tmp_merged.clone();
 
-    bitwise_or(
-        &roi_mask_merged,
-        &tmp_merged,
-        &mut roi_tmp_merged,
-        &no_array(),
-    )?;
+    let tmp_merged_ptr: *mut Mat = &mut tmp_merged;
+
+    unsafe {
+        bitwise_or(
+            &roi_mask_merged,
+            &tmp_merged,
+            &mut *tmp_merged_ptr,
+            &no_array(),
+        )?;
+    }
 
     let mut xor_merged = Mat::default();
-    bitwise_xor(
-        &roi_tmp_merged,
-        &roi_pred_mask,
-        &mut xor_merged,
-        &no_array(),
-    )?;
+    bitwise_xor(&tmp_merged, &roi_pred_mask, &mut xor_merged, &no_array())?;
     let xor_merged_sum = sum_elems(&xor_merged)?.0[0] as i32;
 
     let mut xor_origin = Mat::default();
@@ -268,7 +266,7 @@ fn get_area_threshold(stats: &Mat) -> opencv::Result<i32> {
 
 fn merge_mask_list(
     mut mask_list: Vec<(Array2<u8>, u64)>,
-    pred_mask: &Mask,
+    pred_mask: &MaskCow,
     pred_thresh: u32,
     refinemask_inpaint: bool,
 ) -> anyhow::Result<Mat> {
@@ -281,7 +279,7 @@ fn merge_mask_list(
             Size::new(2 * e_size + 1, 2 * e_size + 1),
             Point::new(e_size, e_size),
         )?;
-        let pred_mask = pred_mask.as_opencv_mat()?;
+        let pred_mask = pred_mask.view().as_opencv_mat()?;
         let mut pred_mask_out =
             Mat::zeros(pred_mask.rows(), pred_mask.cols(), pred_mask.typ())?.to_mat()?;
         opencv::imgproc::erode(

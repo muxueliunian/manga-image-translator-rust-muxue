@@ -12,11 +12,11 @@ use ort::{inputs, session::Session, value::Tensor};
 pub struct Anime4KUpscaler {
     model: Option<Session>,
     model_kind: Anime4KModel,
-    providers: Vec<Providers>,
+    providers: Arc<Vec<Providers>>,
 }
 
 impl Anime4KUpscaler {
-    pub fn new(model_kind: Anime4KModel, providers: Vec<Providers>) -> Self {
+    pub fn new(model_kind: Anime4KModel, providers: Arc<Vec<Providers>>) -> Self {
         Anime4KUpscaler {
             model: None,
             model_kind,
@@ -56,7 +56,7 @@ impl ModelLoad for Anime4KUpscaler {
     fn reload(&mut self) -> anyhow::Result<&mut Session> {
         let model = self.model_kind.to_string();
         let path = self.download_model(&model, &format!("{model}.onnx"))?;
-        let session = new_session(path, self.providers.clone())?;
+        let session = new_session(path, &self.providers)?;
         self.model = Some(session);
         Ok(self.model.as_mut().expect("Set model before"))
     }

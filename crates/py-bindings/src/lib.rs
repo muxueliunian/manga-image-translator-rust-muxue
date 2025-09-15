@@ -7,9 +7,9 @@ use dbnet::DbNetDetector;
 use interface_detector::textlines::Quadrilateral;
 use interface_detector::{DefaultOptions, Detector, PreprocessorOptions};
 use interface_image::{CpuImageProcessor, ImageOp, RawImage};
-use interface_model::CreateData;
 use interface_ocr::QuadrilateralInfo;
 use interface_translator::{LangIdDetector, Language, M2M100Size, Translator};
+use numpy::ndarray::{ArrayView, ArrayView3};
 use numpy::{
     ndarray::{Array2, Array3},
     IntoPyArray as _, PyArray2, PyArray3, PyArrayMethods, PyReadonlyArray3,
@@ -34,7 +34,7 @@ fn get_runtime() -> &'static Runtime {
 #[pyclass]
 pub struct Session {
     processor: Arc<Arc<dyn ImageOp + Send + Sync>>,
-    inner: CreateData,
+    inner: Arc<Vec<Providers>>,
 }
 
 #[pyfunction]
@@ -98,7 +98,7 @@ impl Session {
                 .collect(),
         };
         Session {
-            inner: CreateData::new(providers),
+            inner: Arc::new(providers),
             processor: Arc::new(Arc::new(CpuImageProcessor::default())),
         }
     }
@@ -232,20 +232,22 @@ impl Session {
     fn ctd_detector(&self) -> PyDetector {
         PyDetector {
             inner: Arc::new(Mutex::new(
-                Box::new(CtdDetector::new(self.inner.providers.clone()))
-                    as Box<dyn Detector + Send + Sync>,
+                // allow:clone[arc]
+                Box::new(CtdDetector::new(self.inner.clone())) as Box<dyn Detector + Send + Sync>,
             )),
+            // allow:clone[arc]
             processor: self.processor.clone(),
         }
     }
 
     fn default_detector(&self) -> PyDetector {
         PyDetector {
-            inner: Arc::new(Mutex::new(Box::new(DbNetDetector::new(
-                self.inner.providers.clone(),
-                false,
-            ))
-                as Box<dyn Detector + Send + Sync>)),
+            inner: Arc::new(Mutex::new(
+                // allow:clone[arc]
+                Box::new(DbNetDetector::new(self.inner.clone(), false))
+                    as Box<dyn Detector + Send + Sync>,
+            )),
+            // allow:clone[arc]
             processor: self.processor.clone(),
         }
     }
@@ -253,20 +255,23 @@ impl Session {
     fn paddle_detector(&self) -> PyDetector {
         PyDetector {
             inner: Arc::new(Mutex::new(
-                Box::new(PaddleDetector::new(self.inner.providers.clone()))
+                // allow:clone[arc]
+                Box::new(PaddleDetector::new(self.inner.clone()))
                     as Box<dyn Detector + Send + Sync>,
             )),
+            // allow:clone[arc]
             processor: self.processor.clone(),
         }
     }
 
     fn convnext_detector(&self) -> PyDetector {
         PyDetector {
-            inner: Arc::new(Mutex::new(Box::new(DbNetDetector::new(
-                self.inner.providers.clone(),
-                true,
-            ))
-                as Box<dyn Detector + Send + Sync>)),
+            inner: Arc::new(Mutex::new(
+                // allow:clone[arc]
+                Box::new(DbNetDetector::new(self.inner.clone(), true))
+                    as Box<dyn Detector + Send + Sync>,
+            )),
+            // allow:clone[arc]
             processor: self.processor.clone(),
         }
     }
@@ -388,6 +393,7 @@ impl PyImage {
     }
 
     pub fn to_numpy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray3<u8>>> {
+        // allow:clone[python]
         let data = self.inner.data.clone();
         let (width, height, channels) = (
             self.inner.width as usize,
@@ -472,10 +478,13 @@ impl PyDetector {
         preprocessor_options: PyRef<PyPreprocessorOptions>,
         options: PyRef<PyDefaultOptions>,
     ) -> PyResult<(Vec<PyQuadrilateral>, Bound<'py, PyArray2<u8>>)> {
+        // allow:clone[arc]
         let inner = self.inner.clone();
         let preprocessor_options = preprocessor_options.inner;
         let options = options.inner;
+        // allow:clone[arc]
         let img = image.inner.clone();
+        // allow:clone[arc]
         let processor = self.processor.clone();
         let det = py
             .allow_threads(|| {
@@ -485,6 +494,7 @@ impl PyDetector {
             })
             .map_err(|e| PyRuntimeError::new_err(e.to_string()));
         let (qua, mask) = det?;
+        // allow:clone[python]
         let data = mask.data.clone();
         let (width, height) = (mask.width as usize, mask.height as usize);
         let array = Array2::from_shape_vec((height, width), data)

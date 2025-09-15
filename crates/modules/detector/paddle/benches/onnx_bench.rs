@@ -10,7 +10,7 @@ use interface_model::ModelLoad;
 use paddle::PaddleDetector;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let mut data = PaddleDetector::new(all_providers());
+    let mut data = PaddleDetector::new(Arc::new(all_providers()));
     let img = RawImage::new("./imgs/232264684-5a7bcf8e-707b-4925-86b0-4212382f1680.png")
         .expect("Failed to load image");
     let cpu_image_processor =

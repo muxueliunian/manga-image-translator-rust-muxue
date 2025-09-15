@@ -80,8 +80,8 @@ pub fn create_youdao_translator() -> Option<TranslatorType> {
 
     match (&app_key, &secret_key) {
         (Some(app_key), Some(secret_key)) => Some(Box::new(YoudaoTranslator::new(
-            app_key.clone(),
-            secret_key.clone(),
+            app_key.to_owned(),
+            secret_key.to_owned(),
         )) as TranslatorType),
         _ => {
             if app_key.is_none() {

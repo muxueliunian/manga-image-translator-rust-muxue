@@ -19,12 +19,12 @@ use paddle_ocr_rs::{base_net::BaseNet, db_net::DbNet, scale_param::ScaleParam};
 
 pub struct PaddleDetector {
     db_net: Option<DbNet>,
-    providers: Vec<Providers>,
+    providers: Arc<Vec<Providers>>,
 }
 
 impl PaddleDetector {
     ///convnext: Different model architecture, but based on dbnet
-    pub fn new(providers: Vec<Providers>) -> Self {
+    pub fn new(providers: Arc<Vec<Providers>>) -> Self {
         PaddleDetector {
             providers,
             db_net: None,
@@ -34,7 +34,7 @@ impl PaddleDetector {
 
 fn ses_builder(v: SessionBuilder) -> Result<SessionBuilder, ort::Error> {
     //TODO: dont start with all providers
-    new_session_(v, all_providers())
+    new_session_(v, &all_providers())
 }
 impl ModelLoad for PaddleDetector {
     type T = DbNet;
@@ -264,14 +264,14 @@ mod tests {
 
     #[test]
     fn load_unload() {
-        let mut data = PaddleDetector::new(all_providers());
+        let mut data = PaddleDetector::new(Arc::new(all_providers()));
         data.load().expect("failed to load model");
         data.unload();
     }
 
     #[test]
     fn run() {
-        let mut data = PaddleDetector::new(all_providers());
+        let mut data = PaddleDetector::new(Arc::new(all_providers()));
         let cpu_image_processor =
             Arc::new(CpuImageProcessor::default()) as Arc<dyn ImageOp + Send + Sync>;
         data.load().expect("Failed to load data");

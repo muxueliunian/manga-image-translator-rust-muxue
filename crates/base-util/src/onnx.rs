@@ -40,16 +40,16 @@ pub fn gpu_providers() -> Vec<Providers> {
     ]
 }
 
-pub fn new_session(path: PathBuf, providers: Vec<Providers>) -> anyhow::Result<Session> {
+pub fn new_session(path: PathBuf, providers: &[Providers]) -> anyhow::Result<Session> {
     Ok(new_session_(Session::builder()?, providers)?.commit_from_file(path)?)
 }
 
 pub fn new_session_(
     session_builder: SessionBuilder,
-    providers: Vec<Providers>,
+    providers: &[Providers],
 ) -> Result<SessionBuilder, ort::Error> {
     let providers = providers
-        .into_iter()
+        .iter()
         .map(|v| match v {
             Providers::TensorRT => TensorRTExecutionProvider::default().build(),
             Providers::CUDA => CUDAExecutionProvider::default().build(),

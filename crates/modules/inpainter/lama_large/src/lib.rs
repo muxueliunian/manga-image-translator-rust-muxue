@@ -11,11 +11,11 @@ use util::lama::{lama_add_border, lama_resize_image};
 
 pub struct LamaLargeInpainter {
     model: Option<Session>,
-    providers: Vec<Providers>,
+    providers: Arc<Vec<Providers>>,
 }
 
 impl LamaLargeInpainter {
-    pub fn new(providers: Vec<Providers>) -> Self {
+    pub fn new(providers: Arc<Vec<Providers>>) -> Self {
         Self {
             model: None,
             providers,
@@ -37,7 +37,7 @@ impl ModelLoad for LamaLargeInpainter {
     fn reload(&mut self) -> anyhow::Result<&mut Self::T> {
         self.model = Some(new_session(
             self.download_model("model", "model.onnx")?,
-            self.providers.clone(),
+            &self.providers,
         )?);
         Ok(self.model.as_mut().unwrap())
     }
@@ -64,19 +64,14 @@ impl Inpainter for LamaLargeInpainter {
     ) -> anyhow::Result<interface_image::RawImage> {
         let ho = image.height;
         let wo = image.width;
-        let (mut image, mask) = lama_resize_image(
-            image.deref().clone(),
-            mask,
-            options.inpainting_size,
-            img_processor,
-        )?;
+        let (image, mask) =
+            lama_resize_image(image.view(), mask, options.inpainting_size, img_processor)?;
+        let mut image = image.to_owned();
         let h = image.height;
         let w = image.width;
         image = interface_inpainter::remove_mask_area(image, &mask);
 
         let (image, mask, new_w, new_h) = lama_add_border(image, mask, img_processor);
-        image.clone().to_image().unwrap().save("img.png").unwrap();
-        mask.clone().to_image().unwrap().save("mask.png").unwrap();
         let mask = mask
             .as_nd()?
             .mapv(|v| if v >= 127 { 1.0f32 } else { 0.0f32 })
@@ -132,7 +127,7 @@ mod tests {
             Arc::new(CpuImageProcessor::default()) as Arc<dyn ImageOp + Send + Sync>;
         let mask: Array2<u8> = ndarray_npy::read_npy("mask.npy").unwrap();
         let mask = Mask::from(mask);
-        let mut inp = LamaLargeInpainter::new(vec![]);
+        let mut inp = LamaLargeInpainter::new(Default::default());
         let v = inp
             .inpaint(&Arc::new(img), mask, Default::default(), &img_processor)
             .unwrap();
