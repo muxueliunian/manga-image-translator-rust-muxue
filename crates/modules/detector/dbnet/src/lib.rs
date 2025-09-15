@@ -3,7 +3,7 @@ use std::sync::Arc;
 use base_util::onnx::{new_session, Providers};
 
 use interface_detector::{textlines::Quadrilateral, DefaultOptions, Detector};
-use interface_image::{DimType, ImageOp, Interpolation, Mask, RawImage};
+use interface_image::{DimType, ImageOp, Interpolation, Mask, RawImageCow};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use log::debug;
 
@@ -91,21 +91,22 @@ fn det_batch_forward_default<'a, 'b>(
 impl Detector for DbNetDetector {
     fn infer(
         &mut self,
-        img: RawImage,
+        img: RawImageCow<'_>,
         options: DefaultOptions,
         img_processor: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<(Vec<Quadrilateral>, Mask)> {
         let session = self.load()?;
 
         let (db, mask, shape, ratio_w, ratio_h, pad_w, pad_h) =
-            match shoud_rearrange(&img, options.detect_size as u32) {
+            match shoud_rearrange(img.view(), options.detect_size as u32) {
                 true => {
                     let v = |batch: ArrayView4<'_, u8>| -> anyhow::Result<_> {
                         det_batch_forward_default(session, batch)
                     };
-                    let shape = (img.height, img.width);
+                    let img_ = img.view();
+                    let shape = (img_.height, img_.width);
                     let (db, mask) = det_rearrange_forward(
-                        img,
+                        img.view(),
                         options.detect_size as u32,
                         4,
                         v,
@@ -115,7 +116,13 @@ impl Detector for DbNetDetector {
                 }
                 false => {
                     let resized = util::imageproc::resize_aspect_ratio(
-                        bilateral_filter(&img.as_opencv_mat()?, 17, 80.0, 80.0, BORDER_DEFAULT)?,
+                        bilateral_filter(
+                            &img.view().as_opencv_mat()?,
+                            17,
+                            80.0,
+                            80.0,
+                            BORDER_DEFAULT,
+                        )?,
                         options.detect_size as i64,
                         Interpolation::Bilinear,
                         1.0,

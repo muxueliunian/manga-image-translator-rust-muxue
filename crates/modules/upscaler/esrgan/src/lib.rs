@@ -2,7 +2,9 @@ use std::{fmt::Display, sync::Arc};
 
 use base_util::onnx::{new_session, Providers};
 use half::f16;
-use interface_image::{combine_patches, generate_patches, DimType, ImageOp, RawImage};
+use interface_image::{
+    combine_patches, generate_patches, DimType, ImageOp, RawImage, RawImageCow, RawImageView,
+};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use interface_upscaler::Upscaler;
 use maplit::hashmap;
@@ -119,7 +121,7 @@ pub fn join_batches<A: Clone, Dim: Dimension>(
 }
 
 fn pre_process(
-    image: &RawImage,
+    image: RawImageView,
     patch_size: Option<usize>,
     padding: usize,
     max_batch_size: usize,
@@ -130,18 +132,31 @@ fn pre_process(
     let w = image.width;
     let h = image.height;
     let imgs = match patch_size {
-        Some(v) => generate_patches(image.clone(), v, padding),
-        None => vec![img_processor.add_border_center_wh(
-            img_processor.add_border_wh(image.clone(), w + pad_x, h + pad_y),
-            w + pad_x,
-            h + pad_y,
-        )],
+        Some(v) => generate_patches(image, v, padding)
+            .into_iter()
+            .map(|v| RawImageCow::Owned(v))
+            .collect::<Vec<_>>(),
+        None => {
+            let mut inp = RawImageCow::Borrowed(image);
+            if let RawImageCow::Owned(v) =
+                img_processor.add_border_wh(inp.view(), w + pad_x, h + pad_y)
+            {
+                inp = RawImageCow::Owned(v);
+            }
+            if let RawImageCow::Owned(v) =
+                img_processor.add_border_center_wh(inp.view(), w + pad_x, h + pad_y)
+            {
+                inp = RawImageCow::Owned(v);
+            }
+            vec![inp]
+        }
     };
 
     let patches = imgs
         .into_iter()
         .map(|v| {
-            v.as_ndarray()
+            v.view()
+                .as_ndarray()
                 .unwrap()
                 .mapv(|v| f16::from_f32(v as f32 / 255.0))
                 .permuted_axes((2, 0, 1))
@@ -200,7 +215,13 @@ impl Upscaler for EsrGan {
         let half = self.model_kind.half();
 
         let model = self.load()?;
-        let batches = pre_process(image, patch_size, padding, max_batch_size, img_processor)?;
+        let batches = pre_process(
+            image.view(),
+            patch_size,
+            padding,
+            max_batch_size,
+            img_processor,
+        )?;
         let mut patches = process(model, batches, half)?
             .into_iter()
             .map(RawImage::from)
@@ -215,7 +236,7 @@ impl Upscaler for EsrGan {
                 padding * self.model_kind.zoom(),
             ),
             None => img_processor.remove_border(
-                patches.remove(0),
+                patches.remove(0).view(),
                 w * self.model_kind.zoom() as DimType,
                 h * self.model_kind.zoom() as DimType,
             ),

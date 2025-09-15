@@ -23,7 +23,6 @@ pub fn load_masked_position_encoding(
     let str_size = 256;
     let pos_num = 128;
     let ori_mask = mask
-        .clone()
         .as_nd()?
         .mapv(|v| if v > 127 { 1.0f32 } else { 0.0f32 });
     let mask = op.resize_mask(

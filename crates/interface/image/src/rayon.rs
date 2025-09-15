@@ -11,7 +11,7 @@ use rayon::{
     slice::{ParallelSlice as _, ParallelSliceMut as _},
 };
 
-use crate::{DimType, ImageOp, Interpolation, Mask, RawImage};
+use crate::{DimType, ImageOp, Interpolation, Mask, RawImage, RawImageCow, RawImageView};
 
 #[derive(Default)]
 pub struct RayonImageProcessor;
@@ -27,18 +27,18 @@ impl ImageOp for RayonImageProcessor {
         image
     }
 
-    fn add_border_wh(
+    fn add_border_wh<'a>(
         &self,
-        image: super::RawImage,
+        image: RawImageView<'a>,
         width: DimType,
         height: DimType,
-    ) -> super::RawImage {
+    ) -> RawImageCow<'a> {
         let old_w = image.width;
         let old_h = image.height;
         let channels = image.channels as usize;
 
         if old_w > width && old_h > height {
-            return image;
+            return RawImageCow::Borrowed(image);
         }
 
         let width = width.max(old_w);
@@ -56,12 +56,12 @@ impl ImageOp for RayonImageProcessor {
                 dst_row[..src_row.len()].copy_from_slice(src_row);
             });
 
-        super::RawImage {
+        RawImageCow::Owned(super::RawImage {
             data: new_data,
             width,
             height,
             channels: channels as u8,
-        }
+        })
     }
 
     fn add_border_center(
@@ -104,18 +104,18 @@ impl ImageOp for RayonImageProcessor {
         }
     }
 
-    fn add_border_center_wh(
+    fn add_border_center_wh<'a>(
         &self,
-        image: super::RawImage,
+        image: super::RawImageView<'a>,
         width: DimType,
         height: DimType,
-    ) -> super::RawImage {
+    ) -> RawImageCow<'a> {
         let old_w = image.width;
         let old_h = image.height;
         let channels: u32 = image.channels as u32;
 
         if old_w > width && old_h > height {
-            return image;
+            return RawImageCow::Borrowed(image);
         }
         let width = width.max(old_w);
         let height = height.max(old_h);
@@ -136,17 +136,17 @@ impl ImageOp for RayonImageProcessor {
                 dst_row[start..start + src_row.len()].copy_from_slice(src_row);
             });
 
-        super::RawImage {
+        RawImageCow::Owned(RawImage {
             data: new_data,
             width,
             height,
             channels: channels as u8,
-        }
+        })
     }
 
     fn remove_border(
         &self,
-        image: super::RawImage,
+        image: super::RawImageView,
         width: DimType,
         height: DimType,
     ) -> super::RawImage {
@@ -211,8 +211,8 @@ impl ImageOp for RayonImageProcessor {
         }
     }
 
-    fn rotate_right(&self, image: super::RawImage) -> super::RawImage {
-        let super::RawImage {
+    fn rotate_right(&self, image: super::RawImageView) -> super::RawImage {
+        let super::RawImageView {
             data,
             width,
             height,
@@ -296,7 +296,7 @@ impl ImageOp for RayonImageProcessor {
         }
     }
 
-    fn gamma_correction(&self, image: super::RawImage) -> super::RawImage {
+    fn gamma_correction(&self, image: super::RawImageView) -> super::RawImage {
         assert_eq!(image.channels, 3);
         let mid = 0.5;
         let pixel_count = (image.width as u64) * (image.height as u64);
@@ -435,7 +435,7 @@ impl ImageOp for RayonImageProcessor {
 
     fn resize(
         &self,
-        image: &super::RawImage,
+        image: RawImageView,
         width: DimType,
         height: DimType,
         interpolation: Interpolation,
@@ -453,7 +453,7 @@ impl ImageOp for RayonImageProcessor {
         let src_image = ImageRef::new(
             image.width as u32,
             image.height as u32,
-            image.data.as_slice(),
+            image.data,
             fast_image_resize::PixelType::U8x3,
         )?;
         let mut dst_image = Image::new(
@@ -545,7 +545,7 @@ impl ImageOp for RayonImageProcessor {
         }
     }
 
-    fn transpose(&self, image: RawImage) -> RawImage {
+    fn transpose(&self, image: RawImageView) -> RawImage {
         let mut output = vec![0u8; image.data.len()];
         let channels = image.channels as usize;
 

@@ -10,6 +10,7 @@ mod froms;
 mod gpu;
 mod rayon;
 
+use base_util::ndarray_utils;
 pub use cpu::CpuImageProcessor;
 #[cfg(feature = "gpu")]
 pub use gpu::GpuImageProcessor;
@@ -38,13 +39,102 @@ pub struct RawImage {
     pub channels: u8,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 pub struct RawImageView<'a> {
     pub data: &'a [u8],
     pub width: DimType,
     pub height: DimType,
     /// Always 3
     pub channels: u8,
+}
+
+impl<'a> RawImageView<'a> {
+    pub fn as_ndarray(&'a self) -> Result<ArrayView3<'a, u8>, ndarray::ShapeError> {
+        ArrayView::from_shape(
+            Dim([
+                self.height as usize,
+                self.width as usize,
+                self.channels as usize,
+            ]),
+            self.data,
+        )
+    }
+    pub fn as_opencv_mat(&self) -> Result<BoxedRef<'a, Mat>, opencv::Error> {
+        let mat = Mat::from_slice(self.data)?;
+        let mat = mat.reshape(1, self.height as i32)?;
+        let mat: BoxedRef<'a, Mat> = unsafe { std::mem::transmute(mat) };
+        Ok(mat)
+    }
+    pub fn to_owned(&self) -> RawImage {
+        RawImage {
+            data: self.data.to_vec(),
+            width: self.width,
+            height: self.height,
+            channels: self.channels,
+        }
+    }
+
+    pub fn to_image(&self) -> Result<DynamicImage, anyhow::Error> {
+        self.to_owned().to_image()
+    }
+}
+
+pub enum RawImageCow<'a> {
+    Borrowed(RawImageView<'a>),
+    Owned(RawImage),
+}
+
+impl<'a> From<ArrayView3<'a, u8>> for RawImageCow<'a> {
+    fn from(img: ArrayView3<'a, u8>) -> Self {
+        let shape = img.shape();
+        match ndarray_utils::as_slice(img) {
+            std::borrow::Cow::Borrowed(b) => RawImageCow::Borrowed(RawImageView {
+                data: b,
+                width: shape[1] as DimType,
+                height: shape[0] as DimType,
+                channels: shape[2] as u8,
+            }),
+            std::borrow::Cow::Owned(o) => RawImageCow::Owned(RawImage {
+                data: o,
+                width: shape[1] as DimType,
+                height: shape[0] as DimType,
+                channels: shape[2] as u8,
+            }),
+        }
+    }
+}
+
+impl RawImageCow<'_> {
+    pub fn resolve(self, orig: RawImage) -> RawImage {
+        match self {
+            RawImageCow::Borrowed(_) => orig,
+            RawImageCow::Owned(image) => image,
+        }
+    }
+    pub fn view(&self) -> RawImageView {
+        match self {
+            RawImageCow::Borrowed(view) => *view,
+            RawImageCow::Owned(image) => image.view(),
+        }
+    }
+
+    pub fn to_owned(self) -> RawImage {
+        match self {
+            RawImageCow::Borrowed(view) => view.to_owned(),
+            RawImageCow::Owned(image) => image,
+        }
+    }
+}
+
+impl RawImage {
+    pub fn view<'a>(&'a self) -> RawImageView<'a> {
+        RawImageView {
+            data: &self.data,
+            width: self.width,
+            height: self.height,
+            channels: self.channels,
+        }
+    }
 }
 
 impl<'a> From<&'a RawImage> for RawImageView<'a> {
@@ -520,23 +610,37 @@ impl RawImage {
 
 pub trait ImageOp {
     fn invert(&self, image: RawImage) -> RawImage;
-    fn add_border(&self, image: RawImage, target_side_length: DimType) -> RawImage {
+    fn add_border<'a>(
+        &self,
+        image: RawImageView<'a>,
+        target_side_length: DimType,
+    ) -> RawImageCow<'a> {
         self.add_border_wh(image, target_side_length, target_side_length)
     }
-    fn add_border_wh(&self, image: RawImage, width: DimType, height: DimType) -> RawImage;
+    fn add_border_wh<'a>(
+        &self,
+        image: RawImageView<'a>,
+        width: DimType,
+        height: DimType,
+    ) -> RawImageCow<'a>;
     fn add_border_center(&self, image: RawImage, target_side_length: DimType) -> RawImage;
-    fn add_border_center_wh(&self, image: RawImage, twidth: DimType, height: DimType) -> RawImage;
-    fn remove_border(&self, image: RawImage, width: DimType, height: DimType) -> RawImage;
+    fn add_border_center_wh<'a>(
+        &self,
+        image: RawImageView<'a>,
+        twidth: DimType,
+        height: DimType,
+    ) -> RawImageCow<'a>;
+    fn remove_border(&self, image: RawImageView, width: DimType, height: DimType) -> RawImage;
     fn remove_border_center(&self, image: RawImage, width: DimType, height: DimType) -> RawImage;
-    fn rotate_right(&self, image: RawImage) -> RawImage;
+    fn rotate_right(&self, image: RawImageView) -> RawImage;
     fn rotate_left(&self, image: RawImage) -> RawImage;
     fn rotate_left_mask(&self, mask: Mask) -> Mask;
-    fn gamma_correction(&self, image: RawImage) -> RawImage;
+    fn gamma_correction(&self, image: RawImageView) -> RawImage;
     fn histogram_equalization(&self, image: RawImage) -> RawImage;
-    fn transpose(&self, image: RawImage) -> RawImage;
+    fn transpose(&self, image: RawImageView) -> RawImage;
     fn resize(
         &self,
-        image: &RawImage,
+        image: RawImageView,
         width: DimType,
         height: DimType,
         interpolation: Interpolation,
@@ -561,7 +665,7 @@ pub enum Interpolation {
     Lanczos3,
 }
 
-pub fn generate_patches_m(img: RawImage, patch_size: usize, margin: usize) -> Vec<RawImage> {
+pub fn generate_patches_m(img: RawImageView, patch_size: usize, margin: usize) -> Vec<RawImage> {
     let p = margin;
     let total_size = patch_size + 2 * p;
     let n_x = (img.width as usize + patch_size - 1) / patch_size;
@@ -607,7 +711,7 @@ pub fn generate_patches_m(img: RawImage, patch_size: usize, margin: usize) -> Ve
     patches
 }
 
-pub fn generate_patches(img: RawImage, patch_size: usize, padding: usize) -> Vec<RawImage> {
+pub fn generate_patches(img: RawImageView, patch_size: usize, padding: usize) -> Vec<RawImage> {
     assert!(patch_size > padding * 2);
     let patch_size = patch_size - padding * 2;
     generate_patches_m(img, patch_size, padding)

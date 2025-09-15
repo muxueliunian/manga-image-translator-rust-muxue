@@ -1,7 +1,7 @@
 use std::{ops::Deref, sync::Arc};
 
 use base_util::onnx::{new_session, Providers};
-use interface_image::{ImageOp, RawImage};
+use interface_image::{ImageOp, RawImageCow};
 use interface_inpainter::{Inpainter, InpainterOptions};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use maplit::hashmap;
@@ -75,7 +75,8 @@ impl Inpainter for LamaLargeInpainter {
         image = interface_inpainter::remove_mask_area(image, &mask);
 
         let (image, mask, new_w, new_h) = lama_add_border(image, mask, img_processor);
-
+        image.clone().to_image().unwrap().save("img.png").unwrap();
+        mask.clone().to_image().unwrap().save("mask.png").unwrap();
         let mask = mask
             .as_nd()?
             .mapv(|v| if v >= 127 { 1.0f32 } else { 0.0f32 })
@@ -96,19 +97,20 @@ impl Inpainter for LamaLargeInpainter {
             .remove_axis(Axis(0))
             .permuted_axes((1, 2, 0))
             .mapv(|v| (v * 255.0) as u8);
-        let mut img_inpainted = RawImage::from(img_inpainted);
+        let mut img_inpainted = RawImageCow::from(img_inpainted.view());
         if new_h != h || new_w != w {
-            img_inpainted = img_processor.remove_border(img_inpainted, w, h);
+            img_inpainted =
+                RawImageCow::Owned(img_processor.remove_border(img_inpainted.view(), w, h));
         }
         if h != ho || w != wo {
-            img_inpainted = img_processor.resize(
-                &mut img_inpainted,
+            img_inpainted = RawImageCow::Owned(img_processor.resize(
+                img_inpainted.view(),
                 wo,
                 ho,
                 interface_image::Interpolation::Bicubic,
-            )?;
+            )?);
         }
-        Ok(img_inpainted)
+        Ok(img_inpainted.to_owned())
     }
 }
 
@@ -116,7 +118,7 @@ impl Inpainter for LamaLargeInpainter {
 mod tests {
     use std::sync::Arc;
 
-    use interface_image::{CpuImageProcessor, Mask};
+    use interface_image::{CpuImageProcessor, Mask, RawImage};
     use ndarray::Array2;
 
     use super::*;

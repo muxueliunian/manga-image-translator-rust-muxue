@@ -4,7 +4,7 @@ pub mod textlines;
 use std::sync::Arc;
 
 use base_util::RawSerializable;
-use interface_image::{ImageOp, Mask, RawImage};
+use interface_image::{ImageOp, Mask, RawImage, RawImageCow};
 use interface_model::Model;
 use serde::{Deserialize, Serialize};
 
@@ -66,7 +66,7 @@ pub trait Detector: Model {
     }
     fn infer(
         &mut self,
-        img: RawImage,
+        img: RawImageCow<'_>,
         options: DefaultOptions,
         img_processor: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<(Vec<Quadrilateral>, Mask)>;

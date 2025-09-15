@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use interface_image::{DimType, ImageOp, Mask, RawImage};
+use interface_image::{DimType, ImageOp, Mask, RawImage, RawImageCow};
 
 pub fn resize_keep_aspect(
-    mut img: RawImage,
+    img: RawImage,
     size: u16,
     img_processor: &Arc<dyn ImageOp + Send + Sync>,
 ) -> anyhow::Result<RawImage> {
@@ -12,7 +12,7 @@ pub fn resize_keep_aspect(
     let new_height = img.height as f64 * ratio;
 
     img_processor.resize(
-        &mut img,
+        img.view(),
         new_width as DimType,
         new_height as DimType,
         interface_image::Interpolation::BilinearExact,
@@ -71,18 +71,20 @@ pub fn lama_add_border(
     };
 
     if new_h != h || new_w != w {
-        image = img_processor.add_border_wh(image, new_w, new_h);
+        let temp = img_processor.add_border_wh(image.view(), new_w, new_h);
+        if let RawImageCow::Owned(o) = temp {
+            image = o;
+        }
 
-        let m = img_processor.add_border_wh(
-            RawImage {
-                data: mask.data,
-                width: mask.width,
-                height: mask.height,
-                channels: 1,
-            },
-            new_w,
-            new_h,
-        );
+        let mut m = RawImage {
+            data: mask.data,
+            width: mask.width,
+            height: mask.height,
+            channels: 1,
+        };
+        if let RawImageCow::Owned(o) = img_processor.add_border_wh(m.view(), new_w, new_h) {
+            m = o;
+        }
         mask = Mask {
             data: m.data,
             width: m.width,

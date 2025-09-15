@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use interface_image::{ImageOp, Mask, RawImage};
+use interface_image::{ImageOp, Mask, RawImage, RawImageCow};
 use log::{debug, info};
 
 use crate::{textlines::Quadrilateral, PreprocessorOptions};
@@ -9,7 +9,7 @@ pub fn detect(
     image: &RawImage,
     options: &PreprocessorOptions,
     img_processor: &Arc<dyn ImageOp + Send + Sync>,
-    callback: impl FnOnce(RawImage) -> anyhow::Result<(Vec<Quadrilateral>, Mask)>,
+    callback: impl FnOnce(RawImageCow<'_>) -> anyhow::Result<(Vec<Quadrilateral>, Mask)>,
 ) -> anyhow::Result<Option<(Vec<Quadrilateral>, Mask)>> {
     let img_h = image.height as i64;
     // Automatically add border if image too small (instead of simply resizing due to them more likely containing large fonts)
@@ -18,20 +18,20 @@ pub fn detect(
         add_border = Some((image.width, image.height));
         debug!("Adding border")
     }
-    let mut img = img_processor.add_border(image.clone(), 400);
+    let mut img = img_processor.add_border(image.view(), 400);
     if options.rotate {
         debug!("Rotating image");
-        img = img_processor.rotate_right(img);
+        img = RawImageCow::Owned(img_processor.rotate_right(img.view()));
     }
 
     if options.invert {
         debug!("Adding inversion");
-        img = img_processor.invert(img);
+        img = RawImageCow::Owned(img_processor.invert(img.to_owned()));
     }
 
     if options.gamma_correct {
         debug!("Adding gamma correction");
-        img = img_processor.gamma_correction(img);
+        img = RawImageCow::Owned(img_processor.gamma_correction(img.view()));
     }
 
     let (mut textlines, mut mask) = callback(img)?;

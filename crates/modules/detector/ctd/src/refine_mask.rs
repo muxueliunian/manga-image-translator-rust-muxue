@@ -5,7 +5,7 @@ use imageproc::{
 };
 
 use interface_detector::textlines::Quadrilateral;
-use interface_image::{Mask, RawImage};
+use interface_image::{Mask, RawImage, RawImageCow};
 use ndarray::{s, Array2, ArrayView2, Zip};
 use opencv::{
     core::{
@@ -18,27 +18,28 @@ use opencv::{
 use roots::find_roots_quadratic;
 
 pub fn refine_mask(
-    img: RawImage,
+    img: &RawImageCow,
     mask: Mask,
     blk_list: Vec<Quadrilateral>,
     refinemask_inpaint: bool,
 ) -> anyhow::Result<Mask> {
     let mut mask_refined = Mat::zeros(mask.height as i32, mask.width as i32, CV_8U)?.to_mat()?;
+    let img = img.view();
+    let img_ = img.to_image()?;
     for blk in blk_list {
         let (bx1, by1, bx2, by2) = enlarge_window(blk.xyxy(), img.width, img.height, 2.5, 1.0);
         let im = DynamicImage::from(
-            DynamicImage::from(img.clone().to_image().unwrap())
-                .view(
-                    bx1 as u32,
-                    by1 as u32,
-                    (bx2 - bx1) as u32,
-                    (by2 - by1) as u32,
-                )
-                .to_image(),
+            img_.view(
+                bx1 as u32,
+                by1 as u32,
+                (bx2 - bx1) as u32,
+                (by2 - by1) as u32,
+            )
+            .to_image(),
         );
         let im_gray = im.clone().into_luma8();
         let im_gray = Mask::from(im_gray);
-        let mut im_gray = im_gray.as_nd()?;
+        let im_gray = im_gray.as_nd()?;
         let msk = mask.as_nd()?;
         let msk = msk.slice(s![by1 as usize..by2 as usize, bx1 as usize..bx2 as usize]);
         let mut mask_list = get_topk_masklist(im_gray, &msk)?;

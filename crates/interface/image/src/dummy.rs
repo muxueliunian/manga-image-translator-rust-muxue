@@ -1,4 +1,4 @@
-use crate::{DimType, ImageOp, Mask};
+use crate::{DimType, ImageOp, Mask, RawImage, RawImageCow, RawImageView};
 
 #[derive(Default)]
 pub struct DummyImageProcessor;
@@ -14,21 +14,21 @@ impl ImageOp for DummyImageProcessor {
         image
     }
 
-    fn add_border_wh(
+    fn add_border_wh<'a>(
         &self,
-        img: super::RawImage,
+        img: RawImageView<'a>,
         width: super::DimType,
         height: super::DimType,
-    ) -> super::RawImage {
+    ) -> RawImageCow<'a> {
         if img.width > width && img.height > height {
-            return img;
+            return RawImageCow::Borrowed(img);
         }
-        super::RawImage {
+        RawImageCow::Owned(super::RawImage {
             data: vec![0; width as usize * height as usize * 3],
             width,
             height,
             channels: 3,
-        }
+        })
     }
 
     fn add_border_center(&self, _: super::RawImage, width: super::DimType) -> super::RawImage {
@@ -42,7 +42,7 @@ impl ImageOp for DummyImageProcessor {
 
     fn remove_border(
         &self,
-        _: super::RawImage,
+        _: super::RawImageView,
         width: super::DimType,
         height: super::DimType,
     ) -> super::RawImage {
@@ -68,11 +68,16 @@ impl ImageOp for DummyImageProcessor {
         }
     }
 
-    fn rotate_right(&self, mut image: super::RawImage) -> super::RawImage {
+    fn rotate_right(&self, mut image: super::RawImageView) -> super::RawImage {
         let temp = image.height;
         image.height = image.width;
         image.width = temp;
-        image
+        RawImage {
+            data: vec![0; image.data.len()],
+            width: image.width,
+            height: image.height,
+            channels: image.channels,
+        }
     }
 
     fn rotate_left(&self, mut image: super::RawImage) -> super::RawImage {
@@ -89,8 +94,13 @@ impl ImageOp for DummyImageProcessor {
         mask
     }
 
-    fn gamma_correction(&self, image: super::RawImage) -> super::RawImage {
-        image
+    fn gamma_correction(&self, image: super::RawImageView) -> super::RawImage {
+        RawImage {
+            data: vec![0; image.data.len()],
+            width: image.width,
+            height: image.height,
+            channels: image.channels,
+        }
     }
 
     fn histogram_equalization(&self, image: super::RawImage) -> super::RawImage {
@@ -99,7 +109,7 @@ impl ImageOp for DummyImageProcessor {
 
     fn resize(
         &self,
-        _: &super::RawImage,
+        _: RawImageView,
         width: super::DimType,
         height: super::DimType,
         _: super::Interpolation,
@@ -134,7 +144,7 @@ impl ImageOp for DummyImageProcessor {
         }
     }
 
-    fn transpose(&self, image: super::RawImage) -> super::RawImage {
+    fn transpose(&self, image: super::RawImageView) -> super::RawImage {
         super::RawImage {
             data: vec![0; image.width as usize * image.height as usize],
             width: image.height,
@@ -147,17 +157,17 @@ impl ImageOp for DummyImageProcessor {
         img
     }
 
-    fn add_border_center_wh(
+    fn add_border_center_wh<'a>(
         &self,
-        _: crate::RawImage,
+        _: crate::RawImageView<'a>,
         width: DimType,
         _: DimType,
-    ) -> crate::RawImage {
-        super::RawImage {
+    ) -> crate::RawImageCow<'a> {
+        RawImageCow::Owned(super::RawImage {
             data: vec![0; width as usize * width as usize * 3],
             width,
             height: width,
             channels: 3,
-        }
+        })
     }
 }

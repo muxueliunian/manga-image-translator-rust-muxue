@@ -9,7 +9,12 @@ fn bench_resize_cpu(
     interpolation: Interpolation,
 ) -> RawImage {
     processor
-        .resize(image, image.width * 2, image.height * 2, interpolation)
+        .resize(
+            image.view(),
+            image.width * 2,
+            image.height * 2,
+            interpolation,
+        )
         .expect("Failed to resize")
 }
 
@@ -19,7 +24,12 @@ fn bench_resize_rayon(
     interpolation: Interpolation,
 ) -> RawImage {
     processor
-        .resize(image, image.width * 2, image.height * 2, interpolation)
+        .resize(
+            image.view(),
+            image.width * 2,
+            image.height * 2,
+            interpolation,
+        )
         .expect("Failed to resize")
 }
 

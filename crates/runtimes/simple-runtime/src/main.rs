@@ -108,20 +108,20 @@ async fn main() {
         };
         let exp = models.execute(img, &settings, debug_path).await.unwrap();
         //TODO: from config
-        renderer.render(
-            exp,
-            PngRenderConfig {
-                min_fontsize: 2.0,
-                max_fontsize: 20.0,
-                detect_offset: 1000000.0,
-                fg_color: None,
-                bg_color: None,
-                align: MyAlign::Center,
-                letter_spacing: None,
-                font_size: 0.0,
-                line_height: 0.0,
-                family: None,
-            },
-        );
+        // renderer.render(
+        //     exp,
+        //     PngRenderConfig {
+        //         min_fontsize: 2.0,
+        //         max_fontsize: 20.0,
+        //         detect_offset: 1000000.0,
+        //         fg_color: None,
+        //         bg_color: None,
+        //         align: MyAlign::Center,
+        //         letter_spacing: None,
+        //         font_size: 0.0,
+        //         line_height: 0.0,
+        //         family: None,
+        //     },
+        // );
     }
 }

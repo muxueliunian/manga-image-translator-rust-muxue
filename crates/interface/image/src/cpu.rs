@@ -1,4 +1,6 @@
-use crate::{DimType, ImageOp, Interpolation, Mask, RawImage, RayonImageProcessor};
+use crate::{
+    DimType, ImageOp, Interpolation, Mask, RawImage, RawImageCow, RawImageView, RayonImageProcessor,
+};
 
 #[derive(Default)]
 
@@ -11,18 +13,18 @@ impl ImageOp for CpuImageProcessor {
         image
     }
 
-    fn add_border_wh(
+    fn add_border_wh<'a>(
         &self,
-        image: super::RawImage,
+        image: RawImageView<'a>,
         width: DimType,
         height: DimType,
-    ) -> super::RawImage {
+    ) -> RawImageCow<'a> {
         let old_w = image.width;
         let old_h = image.height;
         let channels: u32 = image.channels as u32;
 
         if old_w > width && old_h > height {
-            return image;
+            return RawImageCow::Borrowed(image);
         }
 
         let width = width.max(old_w);
@@ -45,12 +47,12 @@ impl ImageOp for CpuImageProcessor {
             }
         }
 
-        super::RawImage {
+        RawImageCow::Owned(super::RawImage {
             data: new_data,
             width,
             height,
             channels: channels as u8,
-        }
+        })
     }
 
     fn add_border_center(
@@ -97,18 +99,18 @@ impl ImageOp for CpuImageProcessor {
         }
     }
 
-    fn add_border_center_wh(
+    fn add_border_center_wh<'a>(
         &self,
-        image: super::RawImage,
+        image: super::RawImageView<'a>,
         width: DimType,
         height: DimType,
-    ) -> super::RawImage {
+    ) -> super::RawImageCow<'a> {
         let old_w = image.width;
         let old_h = image.height;
         let channels: u32 = image.channels as u32;
 
         if old_w > width && old_h > height {
-            return image;
+            return RawImageCow::Borrowed(image);
         }
         let width = width.max(old_w);
         let height = height.max(old_h);
@@ -132,17 +134,17 @@ impl ImageOp for CpuImageProcessor {
             }
         }
 
-        super::RawImage {
+        RawImageCow::Owned(super::RawImage {
             data: new_data,
             width,
             height,
             channels: channels as u8,
-        }
+        })
     }
 
     fn remove_border(
         &self,
-        image: super::RawImage,
+        image: super::RawImageView,
         width: DimType,
         height: DimType,
     ) -> super::RawImage {
@@ -211,8 +213,8 @@ impl ImageOp for CpuImageProcessor {
         }
     }
 
-    fn rotate_right(&self, image: super::RawImage) -> super::RawImage {
-        let super::RawImage {
+    fn rotate_right(&self, image: super::RawImageView) -> super::RawImage {
+        let super::RawImageView {
             data,
             width,
             height,
@@ -292,7 +294,7 @@ impl ImageOp for CpuImageProcessor {
         }
     }
 
-    fn gamma_correction(&self, image: super::RawImage) -> super::RawImage {
+    fn gamma_correction(&self, image: super::RawImageView) -> super::RawImage {
         assert_eq!(image.channels, 3);
         let mid = 0.5;
         let pixel_count = (image.width as u64) * (image.height as u64);
@@ -425,7 +427,7 @@ impl ImageOp for CpuImageProcessor {
 
     fn resize(
         &self,
-        image: &super::RawImage,
+        image: RawImageView<'_>,
         width: DimType,
         height: DimType,
         interpolation: Interpolation,
@@ -472,7 +474,7 @@ impl ImageOp for CpuImageProcessor {
         }
     }
 
-    fn transpose(&self, image: RawImage) -> RawImage {
+    fn transpose(&self, image: RawImageView) -> RawImage {
         let channels = image.channels as usize;
         let mut output = vec![0u8; image.data.len()];
         unsafe {

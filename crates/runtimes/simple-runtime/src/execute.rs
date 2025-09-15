@@ -182,7 +182,7 @@ impl Models {
                 .clone()
                 .to_image()
                 .unwrap()
-                .save(debug_path.join("2_inpainted.png"))
+                .save(debug_path.join("5_inpainted.png"))
                 .unwrap();
         }
 

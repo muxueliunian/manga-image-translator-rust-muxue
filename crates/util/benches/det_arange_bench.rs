@@ -31,7 +31,7 @@ fn bench_find_contours_from_ndarray(c: &mut Criterion) {
 
     c.bench_function("det_rearrange_forward", |b| {
         b.iter(|| {
-            det_rearrange_forward(img.clone(), 2048, 4, mocking, &cpu)
+            det_rearrange_forward(img.view(), 2048, 4, mocking, &cpu)
                 .expect("failed to run det_rearrange_forward");
         });
     });

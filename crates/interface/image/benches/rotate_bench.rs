@@ -2,16 +2,16 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use interface_image::{CpuImageProcessor, ImageOp as _, RawImage, RayonImageProcessor};
 
 fn bench_invert_cpu(processor: &mut CpuImageProcessor, image: &RawImage) -> RawImage {
-    processor.rotate_right(image.clone())
+    processor.rotate_right(image.view())
 }
 
 fn bench_invert_rayon(processor: &mut RayonImageProcessor, image: &RawImage) -> RawImage {
-    processor.rotate_right(image.clone())
+    processor.rotate_right(image.view())
 }
 
 #[cfg(feature = "gpu")]
 fn bench_invert_gpu(processor: &mut crate::image::GpuImageProcessor, image: &RawImage) -> RawImage {
-    processor.rotate_right(image.clone())
+    processor.rotate_right(image.view())
 }
 
 fn criterion_benchmark(c: &mut Criterion) {

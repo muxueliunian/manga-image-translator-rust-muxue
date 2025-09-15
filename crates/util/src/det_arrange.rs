@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
 use anyhow::bail;
-use interface_image::{DimType, ImageOp, Interpolation, RawImage};
+use interface_image::{DimType, ImageOp, Interpolation, RawImage, RawImageCow, RawImageView};
 use log::info;
 use ndarray::{s, stack, Array, Array3, Array4, ArrayView3, ArrayView4, Axis, ShapeError, Zip};
 use rayon::prelude::*;
 
-fn square_pad_resize(
-    img: ArrayView3<u8>,
+fn square_pad_resize<'a>(
+    img: ArrayView3<'a, u8>,
     tgt_size: usize,
     processor: &Arc<dyn ImageOp + Send + Sync>,
-) -> anyhow::Result<(RawImage, f64, isize, isize)> {
+) -> anyhow::Result<(RawImageCow<'a>, f64, isize, isize)> {
     let shape = img.shape();
     let (mut h, w) = (shape[0] as isize, shape[1] as isize);
     let mut pad_h: isize = 0;
@@ -26,20 +26,25 @@ fn square_pad_resize(
         pad_h += pad_size;
         pad_w += pad_size;
     }
-    let mut img = RawImage::from(img.to_owned());
+    let mut img = RawImageCow::from(img);
 
     if pad_h > 0 || pad_w > 0 {
-        img = processor.add_border_wh(img, pad_w as DimType, pad_h as DimType);
+        if let RawImageCow::Owned(v) =
+            processor.add_border_wh(img.view(), pad_w as DimType, pad_h as DimType)
+        {
+            img = RawImageCow::Owned(v);
+        }
     }
+
     let down_scale_ratio = tgt_size as f64 / shape[0] as f64;
     assert!(down_scale_ratio <= 1.0);
     if down_scale_ratio < 1.0 {
-        img = processor.resize(
-            &mut img,
+        img = RawImageCow::Owned(processor.resize(
+            img.view(),
             tgt_size as u16,
             tgt_size as u16,
             Interpolation::Bilinear,
-        )?;
+        )?);
     }
 
     Ok((img, down_scale_ratio, pad_h, pad_w))
@@ -120,7 +125,7 @@ fn patch2batches(
         let (p, down_scale_ratio, pad_h, pad_w) =
             square_pad_resize(patch, tgt_size as usize, processor)?;
         assert_eq!(pad_h, pad_w);
-        batches.last_mut().expect("set manually").push(p);
+        batches.last_mut().expect("set manually").push(p.to_owned());
         down_scale_ratio_ = Some(down_scale_ratio);
         pad_size_ = Some(pad_h);
         //TODO:
@@ -184,7 +189,7 @@ fn process_arrays(
     (db_lst, mask_lst)
 }
 
-pub fn extract_patch(img: &RawImage, t: usize, b: usize) -> RawImage {
+pub fn extract_patch(img: RawImageView, t: usize, b: usize) -> RawImage {
     let t = t.min(img.height as usize);
     let b = b.min(img.height as usize);
 
@@ -204,7 +209,7 @@ pub fn extract_patch(img: &RawImage, t: usize, b: usize) -> RawImage {
     }
 }
 
-pub fn shoud_rearrange(img: &RawImage, tgt_size: u32) -> bool {
+pub fn shoud_rearrange(img: RawImageView, tgt_size: u32) -> bool {
     let (w, h) = (img.width, img.height);
 
     let (_, w, h) = if h < w { (true, h, w) } else { (false, w, h) };
@@ -215,7 +220,7 @@ pub fn shoud_rearrange(img: &RawImage, tgt_size: u32) -> bool {
 }
 
 pub fn det_rearrange_forward<F>(
-    mut img: RawImage,
+    img: RawImageView<'_>,
     tgt_size: u32,
     max_batch_size: u8,
     mut dbnet_batch_forward: F,
@@ -225,6 +230,7 @@ where
     F: for<'a> FnMut(ArrayView4<'a, u8>) -> anyhow::Result<(Array4<f32>, Array4<f32>)>,
 {
     let (w, h) = (img.width, img.height);
+    let mut img = RawImageCow::Borrowed(img);
 
     let (transpose, w, h) = if h < w { (true, h, w) } else { (false, w, h) };
 
@@ -233,7 +239,7 @@ where
     );
 
     if transpose {
-        img = processor.transpose(img);
+        img = RawImageCow::Owned(processor.transpose(img.view()));
     }
 
     let pw_num = (f64::floor(2.0 * tgt_size as f64 / w as f64) as u32).max(2);
@@ -258,7 +264,7 @@ where
         .map(|ii| {
             let t = ii * ph_step;
             let b = t + ph;
-            let patch = extract_patch(&img, t as usize, b as usize);
+            let patch = extract_patch(img.view(), t as usize, b as usize);
             let rel_step = t as f64 / h as f64;
             (rel_step, patch)
         })
@@ -429,7 +435,7 @@ mod tests {
     fn find_vertical() {
         let img = RawImage::new("./imgs/01_1-optimized.png").expect("couldnt load npy file");
         let cpu = Arc::new(CpuImageProcessor::default()) as Arc<dyn ImageOp + Send + Sync>;
-        let (db, mask) = det_rearrange_forward(img, 2048, 4, mocking, &cpu).expect("failed");
+        let (db, mask) = det_rearrange_forward(img.view(), 2048, 4, mocking, &cpu).expect("failed");
         let ex_db: Array4<f32> =
             ndarray_npy::read_npy("npys/db2_v.npy").expect("couldnt load npy file");
         let ex_mask: Array4<f32> =
@@ -442,8 +448,9 @@ mod tests {
     fn find_horizontal() {
         let img = RawImage::new("./imgs/01_1-optimized.png").expect("couldnt load npy file");
         let cpu = Arc::new(CpuImageProcessor::default()) as Arc<dyn ImageOp + Send + Sync>;
-        let img = cpu.rotate_right(img);
-        let (db, mask) = det_rearrange_forward(img, 2048, 4, mocking2, &cpu).expect("failed");
+        let img = cpu.rotate_right(img.view());
+        let (db, mask) =
+            det_rearrange_forward(img.view(), 2048, 4, mocking2, &cpu).expect("failed");
         let ex_db: Array4<f32> =
             ndarray_npy::read_npy("npys/db2_h.npy").expect("couldnt load npy file");
         let ex_mask: Array4<f32> =

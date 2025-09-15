@@ -1,6 +1,6 @@
 use std::{borrow::Cow, sync::Arc};
 
-use interface_image::{DimType, ImageOp, Interpolation, RawImage};
+use interface_image::{DimType, ImageOp, Interpolation, RawImage, RawImageCow};
 use ndarray::ArrayView2;
 use opencv::{
     core::{Mat, MatTraitConst as _, Point, Vector, CV_8UC1},
@@ -8,7 +8,7 @@ use opencv::{
 };
 
 pub fn resize_aspect_ratio(
-    mut img: RawImage,
+    img: RawImage,
     square_size: i64,
     interpolation: Interpolation,
     mag_ratio: f64,
@@ -26,7 +26,7 @@ pub fn resize_aspect_ratio(
     );
 
     let proc = op.resize(
-        &mut img,
+        img.view(),
         target_w as DimType,
         target_h as DimType,
         interpolation,
@@ -45,7 +45,12 @@ pub fn resize_aspect_ratio(
         pad_w = MULT - target_w % MULT;
         target_w32 = target_w + pad_w
     }
-    let resized = op.add_border_wh(proc, target_w32 as u16, target_h32 as u16);
+    let resized = op.add_border_wh(proc.view(), target_w32 as u16, target_h32 as u16);
+    let resized = if let RawImageCow::Owned(v) = resized {
+        v
+    } else {
+        proc
+    };
     Ok(ResizeData {
         img: resized,
         ratio,

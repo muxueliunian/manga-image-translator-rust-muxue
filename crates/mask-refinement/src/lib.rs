@@ -97,8 +97,12 @@ pub fn dispatch(
                 .clamp(0.5, 1.0);
             let n_w = (raw_img.width as f64 * scale_factor) as u16;
             let n_h = (raw_img.height as f64 * scale_factor) as u16;
-            let mut img_resized =
-                image_op.resize(raw_img, n_w, n_h, interface_image::Interpolation::Nearest)?;
+            let mut img_resized = image_op.resize(
+                raw_img.view(),
+                n_w,
+                n_h,
+                interface_image::Interpolation::Nearest,
+            )?;
             let img_resized = img_resized.as_opencv_mut_mat()?;
             let mask_resized = image_op.resize_mask(
                 raw_mask,

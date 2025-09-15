@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use crate::db::ModelDb;
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 #[cfg(feature = "onnx")]
 use base_util::onnx::{all_providers, Providers};
 

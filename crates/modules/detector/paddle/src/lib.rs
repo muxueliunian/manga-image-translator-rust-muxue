@@ -11,7 +11,7 @@ use interface_detector::{
     textlines::{MyPoint, Quadrilateral},
     DefaultOptions, Detector,
 };
-use interface_image::{ImageOp, Mask, RawImage};
+use interface_image::{ImageOp, Mask, RawImageCow};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use maplit::hashmap;
 use ort::session::builder::SessionBuilder;
@@ -120,11 +120,12 @@ impl Default for PaddleOptions {
 impl Detector for PaddleDetector {
     fn infer(
         &mut self,
-        img: RawImage,
+        img: RawImageCow<'_>,
         options: DefaultOptions,
         _: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<(Vec<Quadrilateral>, Mask)> {
         let db_net = self.load()?;
+        let img = img.view();
 
         let max_side_len = 960;
         let origin_max_side = img.width.max(img.height);
@@ -138,6 +139,7 @@ impl Detector for PaddleDetector {
 
         // let padding_src = OcrUtils::make_padding(img_src, padding).unwrap();
         let (w, h) = (img.width, img.height);
+
         let img = img.to_image().unwrap().to_rgb8();
 
         let scale = ScaleParam::get_scale_param(&img, resize as u32);

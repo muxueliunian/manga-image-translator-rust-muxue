@@ -6,7 +6,7 @@ use anyhow::anyhow;
 use base_util::onnx::{new_session, Providers};
 
 use interface_detector::{textlines::Quadrilateral, DefaultOptions, Detector};
-use interface_image::{ImageOp, Interpolation, Mask, RawImage};
+use interface_image::{ImageOp, Interpolation, Mask, RawImageCow, RawImageView};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use maplit::hashmap;
 use ndarray::{s, stack, Array2, Array4, ArrayView4, ArrayViewD, Axis};
@@ -66,24 +66,25 @@ impl Model for CtdDetector {
 impl Detector for CtdDetector {
     fn infer(
         &mut self,
-        img: RawImage,
+        img: RawImageCow<'_>,
         _: DefaultOptions,
         img_processor: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<(Vec<Quadrilateral>, Mask)> {
-        let (im_w, im_h) = (img.width, img.height);
+        let img_ = img.view();
+        let (im_w, im_h) = (img_.width, img_.height);
         let session = self.load()?;
-        let (lines_map, mask) = match shoud_rearrange(&img, 1024) {
+        let (lines_map, mask) = match shoud_rearrange(img_, 1024) {
             true => {
                 let v = |batch: ArrayView4<'_, u8>| -> anyhow::Result<_> {
                     det_batch_forward_ctd(session, batch)
                 };
                 let (lines_map, mask) =
-                    det_rearrange_forward(img.clone(), 1024, 4, v, img_processor)?;
+                    det_rearrange_forward(img.view(), 1024, 4, v, img_processor)?;
                 (lines_map, mask)
             }
             false => {
                 let (img_in, _, dw, dh) =
-                    preprocess_img(img.clone(), img_processor, (1024, 1024), true, false)?;
+                    preprocess_img(img.view(), img_processor, (1024, 1024), true, false)?;
                 let tensor = Tensor::from_array(img_in)?;
                 let outputs = session.run(ort::inputs!["input" => tensor])?;
 
@@ -146,7 +147,8 @@ impl Detector for CtdDetector {
             im_h as usize,
             Interpolation::Bilinear,
         )?;
-        let mask_refined = refine_mask::refine_mask(img, mask, qu.clone(), false)?;
+
+        let mask_refined = refine_mask::refine_mask(&img, mask, qu.clone(), false)?;
 
         Ok((qu, mask_refined))
     }
@@ -168,18 +170,21 @@ fn det_batch_forward_ctd<'a, 'b>(
 }
 
 fn preprocess_img(
-    mut img: RawImage,
+    img: RawImageView,
     img_processor: &Arc<dyn ImageOp + Send + Sync>,
     input_size: (u32, u32),
     bgr2rgb: bool,
     half: bool,
 ) -> anyhow::Result<(Array4<f32>, (f64, f64), u32, u32)> {
+    let mut img = RawImageCow::Borrowed(img);
     if bgr2rgb {
-        img = img_processor.bgr_to_rgb(img);
+        img = RawImageCow::Owned(img_processor.bgr_to_rgb(img.to_owned()));
     }
     let (img_in, ratio, (dw, dh)) =
         letterbox(img, img_processor, input_size, false, false, true, 64)?;
+    let img_in = img_in.view();
     let nd = img_in.as_ndarray()?;
+
     let nd = nd.permuted_axes([2, 0, 1]);
     let nd = nd.slice(s![..;-1, .., ..]);
     let nd = nd.mapv(|v| v as f32 / 255.0);
@@ -190,16 +195,17 @@ fn preprocess_img(
     Ok((nd, ratio, dw, dh))
 }
 
-fn letterbox(
-    mut im: RawImage,
+fn letterbox<'a>(
+    mut im: RawImageCow<'a>,
     img_processor: &Arc<dyn ImageOp + Send + Sync>,
     new_shape: (u32, u32),
     auto: bool,
     scale_fill: bool,
     scaleup: bool,
     stride: u32,
-) -> anyhow::Result<(RawImage, (f64, f64), (u32, u32))> {
-    let (w, h) = (im.width, im.height);
+) -> anyhow::Result<(RawImageCow<'a>, (f64, f64), (u32, u32))> {
+    let im_ = im.view();
+    let (w, h) = (im_.width, im_.height);
     let mut r = f64::min(new_shape.0 as f64 / h as f64, new_shape.1 as f64 / w as f64);
     if !scaleup {
         r = 1.0_f64.min(r);
@@ -218,16 +224,22 @@ fn letterbox(
     }
 
     if new_unpad.0 != w as u32 || new_unpad.1 != h as u32 {
-        im = img_processor.resize(
-            &mut im,
+        im = RawImageCow::Owned(img_processor.resize(
+            im.view(),
             new_unpad.0 as u16,
             new_unpad.1 as u16,
             Interpolation::Bilinear,
-        )?;
+        )?);
     }
-    let im_height = im.height;
-    let im_width = im.width;
-    im = img_processor.add_border_wh(im, im_width + dw as u16, im_height + dh as u16);
+    let im_ = im.view();
+
+    let im_height = im_.height;
+    let im_width = im_.width;
+    if let RawImageCow::Owned(vv) =
+        img_processor.add_border_wh(im.view(), im_width + dw as u16, im_height + dh as u16)
+    {
+        im = RawImageCow::Owned(vv);
+    }
     Ok((im, ratio, (dw, dh)))
 }
 

@@ -1,3 +1,4 @@
+pub mod ndarray_utils;
 #[cfg(feature = "onnx")]
 pub mod onnx;
 pub mod project;
