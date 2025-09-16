@@ -137,7 +137,7 @@ fn sample_line_nonzero(mask: &Mask, start: MyPoint<f64>, end: MyPoint<f64>) -> u
 
     let mut count = 0;
     loop {
-        if mask.get(x0 as usize, y0 as usize) != 0 {
+        if mask.get(x0.max(0) as usize, y0.max(0) as usize) != 0 {
             count += 1;
         }
         if x0 == x1 && y0 == y1 {

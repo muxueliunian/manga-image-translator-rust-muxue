@@ -57,7 +57,7 @@ impl<'a> RawImageView<'a> {
     }
     pub fn as_opencv_mat(&self) -> Result<BoxedRef<'a, Mat>, opencv::Error> {
         let mat = Mat::from_slice(self.data)?;
-        let mat = mat.reshape(1, self.height as i32)?;
+        let mat = mat.reshape(self.channels as i32, self.height as i32)?;
         let mat: BoxedRef<'a, Mat> = unsafe { std::mem::transmute(mat) };
         Ok(mat)
     }

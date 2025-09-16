@@ -15,8 +15,8 @@ use opencv::{
     },
     imgproc::{
         bilateral_filter, connected_components_with_stats, dilate, get_structuring_element,
-        morphology_default_border_value, rectangle, CC_STAT_AREA, CC_STAT_HEIGHT, CC_STAT_LEFT,
-        CC_STAT_TOP, CC_STAT_WIDTH, LINE_8, MORPH_ELLIPSE,
+        morphology_default_border_value, morphology_ex, rectangle, CC_STAT_AREA, CC_STAT_HEIGHT,
+        CC_STAT_LEFT, CC_STAT_TOP, CC_STAT_WIDTH, LINE_8, MORPH_CLOSE, MORPH_ELLIPSE,
     },
 };
 use ordered_float::OrderedFloat;
@@ -365,7 +365,21 @@ pub fn complete_mask(
         BORDER_CONSTANT,
         morphology_default_border_value()?,
     )?;
-    Ok(Some(dst))
+
+    let mut dst2 = Mat::default();
+
+    let kern = get_structuring_element(MORPH_ELLIPSE, Size::new(5, 5), Point_::new(-1, -1))?;
+    morphology_ex(
+        &dst,
+        &mut dst2,
+        MORPH_CLOSE,
+        &kern,
+        Point_::new(-1, -1),
+        1,
+        BORDER_CONSTANT,
+        morphology_default_border_value()?,
+    )?;
+    Ok(Some(dst2))
 }
 
 fn mask_to_feat_first(rawmask: Array2<u8>) -> anyhow::Result<Array2<f32>> {

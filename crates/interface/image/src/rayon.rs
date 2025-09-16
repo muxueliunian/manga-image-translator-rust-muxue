@@ -1,3 +1,4 @@
+use anyhow::ensure;
 use fast_image_resize::{
     images::{Image, ImageRef},
     FilterType, ResizeAlg, ResizeOptions, Resizer,
@@ -440,7 +441,11 @@ impl ImageOp for RayonImageProcessor {
         height: DimType,
         interpolation: Interpolation,
     ) -> anyhow::Result<super::RawImage> {
-        assert_eq!(image.channels, 3);
+        ensure!(
+            image.channels == 3,
+            "Expected 3 channels, but got {}",
+            image.channels
+        );
         let resize_alg = match interpolation {
             Interpolation::Nearest => ResizeAlg::Nearest,
             Interpolation::Box => ResizeAlg::Convolution(FilterType::Box),
