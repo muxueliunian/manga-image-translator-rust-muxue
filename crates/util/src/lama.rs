@@ -20,7 +20,7 @@ pub fn resize_keep_aspect(
 }
 
 pub fn resize_keep_aspect_mask(
-    mut img: Mask,
+    img: Mask,
     size: u16,
     img_processor: &Arc<dyn ImageOp + Send + Sync>,
 ) -> anyhow::Result<Mask> {
@@ -29,7 +29,7 @@ pub fn resize_keep_aspect_mask(
     let new_height = img.height as f64 * ratio;
 
     img_processor.resize_mask(
-        &mut img,
+        img.view(),
         new_width as usize,
         new_height as usize,
         interface_image::Interpolation::BilinearExact,

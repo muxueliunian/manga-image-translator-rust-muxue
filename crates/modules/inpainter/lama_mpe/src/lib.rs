@@ -74,7 +74,7 @@ impl Inpainter for LamaLargeInpainter {
         image = interface_inpainter::remove_mask_area(image, &mask);
 
         let (image, mask, new_w, new_h) = lama_add_border(image, mask, img_processor);
-        let (rel_pos, direct) = mpe::load_masked_position_encoding(mask.clone(), img_processor)?;
+        let (rel_pos, direct) = mpe::load_masked_position_encoding(mask.view(), img_processor)?;
         let mask = mask
             .as_nd()?
             .mapv(|v| if v >= 127 { 1.0f32 } else { 0.0f32 })

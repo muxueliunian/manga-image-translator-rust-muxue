@@ -195,14 +195,10 @@ mod tests {
                 &(img_processor as Arc<dyn ImageOp + Send + Sync>),
             )
             .expect("Failed to upscale image");
-        upscaled
-            .clone()
-            .to_image()
-            .unwrap()
-            .save("upscaled.png")
-            .unwrap();
+
         assert_eq!(upscaled.width, w * upscaler.model_kind.scale() as DimType);
         assert_eq!(upscaled.height, w * upscaler.model_kind.scale() as DimType);
+        upscaled.to_image().unwrap().save("upscaled.png").unwrap();
     }
 
     #[test]

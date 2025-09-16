@@ -4030,6 +4030,7 @@ version = "0.10.0"
 dependencies = [
  "anyhow",
  "argminmax",
+ "base-util 0.10.0",
  "densecrf",
  "geo",
  "interface-detector",

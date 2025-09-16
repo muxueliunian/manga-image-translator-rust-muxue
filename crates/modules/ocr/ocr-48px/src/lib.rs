@@ -3,7 +3,10 @@ mod infer;
 
 use std::{fs::read_to_string, ops::Deref, sync::Arc};
 
-use base_util::onnx::{new_session, Providers};
+use base_util::{
+    onnx::{new_session, Providers},
+    opencv_utils::to_continous2,
+};
 use interface_detector::textlines::Quadrilateral;
 use interface_image::{ImageOp, RawImage};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
@@ -135,14 +138,8 @@ impl Ocr for Ocr48px {
             let text_height = text_height as usize;
             let mut region = Array4::<u8>::zeros((n, text_height, max_width, 3));
             for (i, tmp) in img_slice.iter().enumerate() {
-                let keep_alive;
-                let data = match tmp.data_bytes() {
-                    Ok(bytes) => bytes,
-                    Err(_) => {
-                        keep_alive = (*tmp).clone();
-                        keep_alive.data_bytes().unwrap()
-                    }
-                };
+                let tmp = to_continous2(tmp);
+                let data = tmp.data_bytes().expect("to_continous used");
                 let rows = tmp.rows() as usize;
                 let cols = tmp.cols() as usize;
                 let row_stride = tmp.step1(0).unwrap();
@@ -235,6 +232,7 @@ impl Ocr for Ocr48px {
                         ]),
                         false => None,
                     },
+                    // allow:clone[arc]
                     pos: areas[indices[i]].clone(),
                     prob: pred.prob as f64,
                 });

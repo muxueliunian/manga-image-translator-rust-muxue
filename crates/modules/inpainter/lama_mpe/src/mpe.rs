@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use fast_image_resize::{images::Image, ResizeAlg, ResizeOptions, SrcCropping};
-use interface_image::{ImageOp, Mask};
+use interface_image::{ImageOp, Mask, MaskView};
 use ndarray::{stack, Array2, Array3, Axis, Zip};
 use util::{
     nd::to_raw,
@@ -9,7 +9,7 @@ use util::{
 };
 
 pub fn load_masked_position_encoding(
-    mut mask: Mask,
+    mask: MaskView,
     op: &Arc<dyn ImageOp + Send + Sync>,
 ) -> anyhow::Result<(Array2<i64>, Array3<i64>)> {
     let (ori_h, ori_w) = (mask.height as usize, mask.width as usize);
@@ -22,11 +22,12 @@ pub fn load_masked_position_encoding(
     let ones_filter = Input::from_slice_2d(&vec![vec![1.0f32; 3]; 3]).unwrap();
     let str_size = 256;
     let pos_num = 128;
+
     let ori_mask = mask
         .as_nd()?
         .mapv(|v| if v > 127 { 1.0f32 } else { 0.0f32 });
     let mask = op.resize_mask(
-        &mut mask,
+        mask,
         str_size,
         str_size,
         interface_image::Interpolation::Box,

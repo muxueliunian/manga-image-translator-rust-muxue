@@ -1,5 +1,6 @@
 use crate::{
-    DimType, ImageOp, Interpolation, Mask, RawImage, RawImageCow, RawImageView, RayonImageProcessor,
+    DimType, ImageOp, Interpolation, Mask, MaskView, RawImage, RawImageCow, RawImageView,
+    RayonImageProcessor,
 };
 
 #[derive(Default)]
@@ -437,7 +438,7 @@ impl ImageOp for CpuImageProcessor {
 
     fn resize_mask(
         &self,
-        image: &Mask,
+        image: MaskView,
         width: usize,
         height: usize,
         interpolation: Interpolation,

@@ -2,16 +2,18 @@ mod decode;
 
 use std::{fs::read_to_string, ops::Deref, sync::Arc};
 
-use base_util::onnx::{new_session, Providers};
+use base_util::{
+    onnx::{new_session, Providers},
+    opencv_utils::to_continous2,
+};
 use interface_detector::textlines::Quadrilateral;
-use interface_image::{ImageOp, Mask, RawImage};
+use interface_image::{ImageOp, RawImage};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use interface_ocr::{Ocr, QuadrilateralInfo};
 use maplit::hashmap;
 use ndarray::{s, Array4};
 use opencv::core::{MatTraitConst as _, MatTraitConstManual};
 use ort::session::Session;
-use parking_lot::Mutex;
 use util::{
     average::AvgMeter, resize::get_transformed_region, text_direction::generate_text_direction,
 };
@@ -130,14 +132,9 @@ impl Ocr for Ctc48pxOcr {
             let text_height = text_height as usize;
             let mut region = Array4::<u8>::zeros((n, text_height, max_width, 3));
             for (i, tmp) in img_slice.iter().enumerate() {
-                let keep_alive;
-                let data = match tmp.data_bytes() {
-                    Ok(bytes) => bytes,
-                    Err(_) => {
-                        keep_alive = (*tmp).clone();
-                        keep_alive.data_bytes().unwrap()
-                    }
-                };
+                let tmp = to_continous2(*tmp);
+                let data = tmp.data_bytes().expect("used to_continous");
+
                 let rows = tmp.rows() as usize;
                 let cols = tmp.cols() as usize;
                 let row_stride = tmp.step1(0).unwrap();
@@ -193,6 +190,7 @@ impl Ocr for Ctc48pxOcr {
                         avgs[4].average() as u8,
                         avgs[5].average() as u8,
                     ]),
+                    // allow:clone[arc]
                     pos: areas[indices[i]].clone(),
                     prob,
                 });

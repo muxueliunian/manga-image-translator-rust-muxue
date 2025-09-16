@@ -100,7 +100,7 @@ pub fn rearrange_patches(input: Array4<u8>, p_num: usize, transpose: bool) -> Ar
 }
 
 fn patch2batches(
-    patch_lst: Vec<RawImage>,
+    patch_lst: Vec<Arc<RawImage>>,
     p_num: usize,
     transpose: bool,
     max_batch_size: usize,
@@ -266,7 +266,7 @@ where
             let b = t + ph;
             let patch = extract_patch(img.view(), t as usize, b as usize);
             let rel_step = t as f64 / h as f64;
-            (rel_step, patch)
+            (rel_step, Arc::new(patch))
         })
         .collect();
 
@@ -276,16 +276,17 @@ where
     }
 
     if pad_num > 0 {
-        let template = RawImage {
+        let template = Arc::new(RawImage {
             data: vec![0; patch_list[0].data.len()],
             width: patch_list[0].width,
             height: patch_list[0].height,
             channels: patch_list[0].channels,
-        };
+        });
 
         for ii in ph_num..(ph_num + pad_num as u32) {
             let t = ii * ph_step;
             rel_step_list.push(t as f64 / h as f64);
+            // allow:clone[arc]
             patch_list.push(template.clone());
         }
     }

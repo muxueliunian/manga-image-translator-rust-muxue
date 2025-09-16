@@ -11,7 +11,7 @@ use rayon::{
     slice::{ParallelSlice as _, ParallelSliceMut as _},
 };
 
-use crate::{DimType, ImageOp, Interpolation, Mask, RawImage, RawImageCow, RawImageView};
+use crate::{DimType, ImageOp, Interpolation, Mask, MaskView, RawImage, RawImageCow, RawImageView};
 
 #[derive(Default)]
 pub struct RayonImageProcessor;
@@ -476,7 +476,7 @@ impl ImageOp for RayonImageProcessor {
 
     fn resize_mask(
         &self,
-        image: &Mask,
+        image: MaskView,
         width: usize,
         height: usize,
         interpolation: Interpolation,
@@ -493,7 +493,7 @@ impl ImageOp for RayonImageProcessor {
         let src_image = ImageRef::new(
             image.width as u32,
             image.height as u32,
-            image.data.as_slice(),
+            image.data,
             fast_image_resize::PixelType::U8,
         )?;
         let mut dst_image = Image::new(

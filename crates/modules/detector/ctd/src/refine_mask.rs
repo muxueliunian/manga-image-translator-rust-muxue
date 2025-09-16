@@ -20,7 +20,7 @@ use roots::find_roots_quadratic;
 pub fn refine_mask(
     img: &RawImageCow,
     mask: Mask,
-    blk_list: Vec<Quadrilateral>,
+    blk_list: &[Quadrilateral],
     refinemask_inpaint: bool,
 ) -> anyhow::Result<Mask> {
     let mut mask_refined = Mat::zeros(mask.height as i32, mask.width as i32, CV_8U)?.to_mat()?;
@@ -67,12 +67,12 @@ fn ndarray_to_gray_image(arr: &ArrayView2<u8>) -> GrayImage {
     GrayImage::from_raw(arr.dim().1 as u32, arr.dim().0 as u32, data).unwrap()
 }
 
-fn gray_image_to_ndarray(img: &GrayImage) -> anyhow::Result<Array2<u8>> {
+fn gray_image_to_ndarray(img: &GrayImage) -> anyhow::Result<ArrayView2<u8>> {
     let (width, height) = img.dimensions();
     let data = img.as_raw();
-    Ok(Array2::from_shape_vec(
+    Ok(ArrayView2::from_shape(
         (height as usize, width as usize),
-        data.clone(),
+        data,
     )?)
 }
 

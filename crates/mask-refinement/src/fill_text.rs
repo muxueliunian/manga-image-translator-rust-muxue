@@ -1,6 +1,7 @@
 use std::mem;
 
 use anyhow::{anyhow, bail};
+use base_util::{ndarray_utils, opencv_utils::as_slice};
 use geo::{
     Area, BooleanOps as _, Centroid, ConvexHull as _, Distance as _, Euclidean, MultiPoint, Point,
 };
@@ -150,30 +151,6 @@ pub fn apply_mask_ratio<T: Copy + Eq + Default>(
     }
 }
 
-pub fn to_continuous<T>(s: &mut Mat) -> &[T] {
-    let len = s.total() * s.channels() as usize;
-
-    let data_ptr = if s.is_continuous() {
-        let data_ptr = s.data() as *const T;
-        data_ptr
-    } else {
-        let mut new = s.clone();
-        mem::swap(s, &mut new);
-        let data_ptr = s.data() as *const T;
-        data_ptr
-    };
-    let slice = unsafe { std::slice::from_raw_parts(data_ptr, len) };
-    slice
-}
-
-fn as_continuous<A: Clone, B: Dimension>(s: Array<A, B>) -> Array<A, B> {
-    if s.as_slice().is_some() {
-        s
-    } else {
-        s.to_owned()
-    }
-}
-
 pub fn complete_mask(
     textlines: Vec<Quadrilateral>,
     img: BoxedRefMut<'_, Mat>,
@@ -210,7 +187,7 @@ pub fn complete_mask(
         vec![RatioMat::new(mask.rows() as usize, mask.cols() as usize); m];
     let label_rows = labels.rows() as usize;
     let label_cols = labels.cols() as usize;
-    let labels = RatioMatSlice::new(to_continuous(&mut labels), label_rows, label_cols);
+    let labels = RatioMatSlice::new(as_slice(&mut labels), label_rows, label_cols);
 
     for label in 1..num_labels {
         if *stats.at_2d::<i32>(label, CC_STAT_AREA)? <= 9 {
@@ -336,18 +313,14 @@ pub fn complete_mask(
         let roi = Rect::new(x, y, width, height);
 
         let mut roi_mat = Mat::roi(&img, roi)?.clone_pointee();
-        let img_region = to_continuous(&mut roi_mat);
-
-        let cc_region = as_continuous(refine_mask(img_region, w1 as u32, h1 as u32, cc_region)?);
+        let img_region = as_slice(&mut roi_mat);
+        let cc_region = refine_mask(img_region, w1 as u32, h1 as u32, cc_region)?;
 
         let cc_region_shape = cc_region.shape();
         let mut cc = Mat::from_slice_mut(&mut cc.data)?;
         let mut cc = cc.reshape_mut(1, img.rows() as i32)?;
-        let cc_region = Mat::from_slice(
-            cc_region
-                .as_slice()
-                .ok_or(anyhow!("cc_region is not continuous"))?,
-        )?;
+        let cc_region = ndarray_utils::as_slice(cc_region.view());
+        let cc_region = Mat::from_slice(cc_region.as_ref())?;
         let cc_region = cc_region.reshape(1, cc_region_shape[0] as i32)?;
         let mut roi_mat = Mat::roi_mut(&mut cc, roi)?;
         cc_region.copy_to(&mut roi_mat)?;

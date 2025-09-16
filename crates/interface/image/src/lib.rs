@@ -410,6 +410,12 @@ impl MaskCow<'_> {
 }
 
 impl<'a> MaskView<'a> {
+    pub fn as_nd(&self) -> anyhow::Result<ArrayView2<'_, u8>> {
+        Ok(ArrayView2::from_shape(
+            (self.height as usize, self.width as usize),
+            &self.data,
+        )?)
+    }
     pub fn as_opencv_mat(&self) -> Result<BoxedRef<'a, Mat>, opencv::Error> {
         let mat = Mat::from_slice(self.data)?;
         let mat = mat.reshape(1, self.height as i32)?;
@@ -484,6 +490,7 @@ impl Mask {
             &self.data,
         )?)
     }
+
     pub fn to_nd(self) -> anyhow::Result<Array2<u8>> {
         Ok(Array2::from_shape_vec(
             (self.height as usize, self.width as usize),
@@ -619,7 +626,7 @@ pub trait ImageOp {
     ) -> anyhow::Result<RawImage>;
     fn resize_mask(
         &self,
-        image: &Mask,
+        image: MaskView,
         width: usize,
         height: usize,
         interpolation: Interpolation,

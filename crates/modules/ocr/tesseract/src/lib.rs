@@ -62,6 +62,7 @@ impl Ocr for TesseractOCR {
         img_processor: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<Vec<interface_ocr::QuadrilateralInfo>> {
         let mut texts = vec![];
+        // allow:clone[arc]
         let image = image.clone();
         let grayscale = spawn_blocking(move || {
             Arc::new(
@@ -76,6 +77,7 @@ impl Ocr for TesseractOCR {
 
         for area in areas {
             let bbox = area.lock().aabb();
+            // allow:clone[arc]
             let grayscale = grayscale.clone();
             let img = spawn_blocking(move || {
                 let view =
@@ -84,6 +86,7 @@ impl Ocr for TesseractOCR {
             })
             .await?;
 
+            // allow:clone[arc]
             texts.push(self.detect_patch(img, area.clone(), img_processor).await?);
         }
 

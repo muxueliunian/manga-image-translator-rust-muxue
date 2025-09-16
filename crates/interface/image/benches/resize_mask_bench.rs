@@ -1,14 +1,10 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use interface_image::{CpuImageProcessor, ImageOp as _, Interpolation, Mask, RayonImageProcessor};
 
-fn bench_resize_cpu(
-    processor: &mut CpuImageProcessor,
-    image: &mut Mask,
-    interpolation: Interpolation,
-) {
+fn bench_resize_cpu(processor: &mut CpuImageProcessor, image: &Mask, interpolation: Interpolation) {
     processor
         .resize_mask(
-            image,
+            image.view(),
             image.width as usize * 2,
             image.height as usize * 2,
             interpolation,
@@ -18,12 +14,12 @@ fn bench_resize_cpu(
 
 fn bench_resize_rayon(
     processor: &mut RayonImageProcessor,
-    image: &mut Mask,
+    image: &Mask,
     interpolation: Interpolation,
 ) {
     processor
         .resize_mask(
-            image,
+            image.view(),
             image.width as usize * 2,
             image.height as usize * 2,
             interpolation,

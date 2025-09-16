@@ -1,5 +1,6 @@
 use std::{collections::HashMap, mem};
 
+use base_util::ndarray_utils::as_slice;
 use ndarray::{
     s, stack, Array, Array1, Array2, Array3, Array4, Array5, ArrayView2, ArrayView3, ArrayViewD,
     Axis, Ix2,
@@ -139,6 +140,7 @@ pub fn infer(
         .enumerate()
         .flat_map(|(i, hypo)| {
             (0..beams_k as usize).map(move |k| {
+                // allow:clone[beam search]
                 hypo.clone().extend(
                     *pred_chars_index.get((i, k)).unwrap(),
                     *pred_chars_values.get((i, k)).unwrap(),
@@ -173,6 +175,7 @@ pub fn infer(
         for (i, h) in hypos.iter().enumerate() {
             let entries = (0..beams_k as usize)
                 .map(|k| {
+                    // allow:clone[beam search]
                     h.clone().extend(
                         *pred_chars_index.get((i, k)).unwrap(),
                         *pred_chars_values.get((i, k)).unwrap(),
@@ -259,23 +262,13 @@ pub fn infer(
         res.push(Pred {
             out_idx,
             prob,
-            fg_pred: to_tuple3(nd_to_raw(fg_pred)),
-            bg_pred: to_tuple3(nd_to_raw(bg_pred)),
-            fg_ind_pred: to_tuple2(nd_to_raw(fg_ind_pred)),
-            bg_ind_pred: to_tuple2(nd_to_raw(bg_ind_pred)),
+            fg_pred: to_tuple3(as_slice(fg_pred).to_vec()),
+            bg_pred: to_tuple3(as_slice(bg_pred).to_vec()),
+            fg_ind_pred: to_tuple2(as_slice(fg_ind_pred).to_vec()),
+            bg_ind_pred: to_tuple2(as_slice(bg_ind_pred).to_vec()),
         });
     }
     res
-}
-
-fn nd_to_raw(item: ArrayViewD<f32>) -> Vec<f32> {
-    let mut item = item.to_owned();
-    if !item.is_standard_layout() {
-        item = item.clone();
-    }
-    let (data, offset) = item.into_raw_vec_and_offset();
-    assert_eq!(offset.unwrap_or_default(), 0);
-    data
 }
 
 fn to_tuple2(items: Vec<f32>) -> Vec<(f32, f32)> {

@@ -35,22 +35,20 @@ impl MyPoint {
     }
 }
 
-fn roll_rows(arr: &Array2<f32>, shift: isize) -> Array2<f32> {
+fn roll_rows(arr: Array2<f32>, shift: isize) -> Array2<f32> {
     let n_rows = arr.shape()[0] as isize;
     if n_rows == 0 {
-        return arr.clone();
+        return arr;
     }
 
-    // Normalize shift to positive value
     let normalized_shift = (shift % n_rows + n_rows) % n_rows;
     let split_point = (n_rows - normalized_shift) as usize;
 
-    // Split array into two parts
     let (top, bottom) = arr.view().split_at(Axis(0), split_point);
 
-    // Concatenate parts in reverse order
     concatenate![Axis(0), bottom, top]
 }
+
 impl SegDetectorRepresenter {
     fn binarize(&self, pred: &Array3<f32>) -> Array3<bool> {
         pred.mapv(|x| x > self.thresh)
@@ -284,7 +282,7 @@ impl SegDetectorRepresenter {
                 .min_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal)) // Use `partial_cmp` for floats
                 .map(|(idx, _)| idx)
                 .ok_or(anyhow!("box is empty"))?;
-            let box_ = roll_rows(&box_, 4 - startidx as isize);
+            let box_ = roll_rows(box_, 4 - startidx as isize);
             scores[index] = score;
             boxes
                 .slice_mut(s![index, .., ..])

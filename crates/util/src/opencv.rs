@@ -1,3 +1,4 @@
+use base_util::opencv_utils::to_continous;
 use interface_image::RawImage;
 use ndarray::{Array2, Array3, Axis};
 use opencv::core::{DataType, Mat, MatTraitConst, Point, ToInputArray, BORDER_DEFAULT};
@@ -74,7 +75,7 @@ pub fn convert<T, DT>(
     m: Mat,
     convert: fn(usize, usize, usize, &[DT]) -> anyhow::Result<T>,
 ) -> anyhow::Result<T> {
-    let m = if m.is_continuous() { m } else { m.clone() };
+    let m = to_continous(m);
 
     let size = m.size()?;
     let rows = size.height as usize;

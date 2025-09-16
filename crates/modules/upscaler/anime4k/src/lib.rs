@@ -94,7 +94,6 @@ impl Upscaler for Anime4KUpscaler {
         _: &Arc<dyn interface_image::ImageOp + Send + Sync>,
     ) -> anyhow::Result<RawImage> {
         let image = image
-            .clone()
             .as_ndarray()
             .unwrap()
             .mapv(|v| f16::from_f32(v as f32 / 255.0))

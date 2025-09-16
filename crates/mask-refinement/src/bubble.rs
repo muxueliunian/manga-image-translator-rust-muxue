@@ -1,7 +1,8 @@
 use std::ops::Range;
 
 use anyhow::anyhow;
-use ndarray::{Array3, Axis};
+use base_util::opencv_utils::{to_continous, to_continous2};
+use ndarray::{Array3, ArrayView3, Axis};
 use opencv::{
     core::{Mat, MatTraitConst as _, MatTraitConstManual, CV_8U, CV_MAT_DEPTH},
     imgproc::{threshold, THRESH_BINARY},
@@ -46,19 +47,11 @@ fn convert(mat: &Mat) -> Result<Array3<f32>, ndarray::ShapeError> {
     let mat_type = mat.typ();
     assert_eq!(CV_MAT_DEPTH(mat_type), CV_8U, "Expected CV_8U Mat");
     assert_eq!(mat.channels(), 3, "Expected single-channel grayscale Mat");
-    let data = if mat.is_continuous() {
-        mat.data_bytes()
-            .expect("Checked is_continuous before")
-            .to_vec()
-    } else {
-        mat.clone()
-            .data_bytes()
-            .expect("Cloned mat before")
-            .to_vec()
-    };
+    let mat = to_continous2(mat);
+    let data = mat.data_bytes().expect("to_continous used");
     let rows = mat.rows() as usize;
     let cols = mat.cols() as usize;
-    Ok(Array3::from_shape_vec((rows, cols, 3), data)?.mapv(|x| x as f32))
+    Ok(ArrayView3::from_shape((rows, cols, 3), data)?.mapv(|x| x as f32))
 }
 
 fn count_zero_pixels_in_range(

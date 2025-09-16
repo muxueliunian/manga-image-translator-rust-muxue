@@ -75,7 +75,7 @@ pub fn dispatch(
 ) -> anyhow::Result<Mask> {
     let raw_mask_ = if furi {
         Cow::Owned(image_op.resize_mask(
-            raw_mask,
+            raw_mask.view(),
             raw_img.width as usize,
             raw_img.height as usize,
             interface_image::Interpolation::Nearest,
@@ -105,7 +105,7 @@ pub fn dispatch(
             )?;
             let img_resized = img_resized.as_opencv_mut_mat()?;
             let mask_resized = image_op.resize_mask(
-                raw_mask,
+                raw_mask.view(),
                 n_w as usize,
                 n_h as usize,
                 interface_image::Interpolation::Nearest,
@@ -127,10 +127,10 @@ pub fn dispatch(
             )?;
             match final_mask {
                 Some(mask) => {
-                    let mut mask = Mask::from(mask);
+                    let mask = Mask::from(mask);
                     let mut mask = image_op
                         .resize_mask(
-                            &mut mask,
+                            mask.view(),
                             size.0 as usize,
                             size.1 as usize,
                             interface_image::Interpolation::Nearest,

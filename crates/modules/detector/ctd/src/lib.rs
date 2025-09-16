@@ -142,13 +142,13 @@ impl Detector for CtdDetector {
             })
             .collect::<Vec<_>>();
         let mask = img_processor.resize_mask(
-            &mut mask,
+            mask.view(),
             im_w as usize,
             im_h as usize,
             Interpolation::Bilinear,
         )?;
 
-        let mask_refined = refine_mask::refine_mask(&img, mask, qu.clone(), false)?;
+        let mask_refined = refine_mask::refine_mask(&img, mask, &qu, false)?;
 
         Ok((qu, mask_refined))
     }

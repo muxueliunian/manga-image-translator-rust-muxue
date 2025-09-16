@@ -1,3 +1,4 @@
+use base_util::opencv_utils::to_continous;
 use image::{DynamicImage, GrayImage};
 use ndarray::{Array2, Array3};
 use opencv::core::{Mat, MatTraitConst as _};
@@ -17,12 +18,7 @@ impl TryFrom<Mat> for RawImage {
     type Error = opencv::Error;
 
     fn try_from(value: Mat) -> Result<Self, Self::Error> {
-        let resized = if value.is_continuous() {
-            value
-        } else {
-            // allow:clone[to_contiguous]
-            value.clone()
-        };
+        let resized = to_continous(value);
 
         let size = resized.size()?;
         let rows = size.height as usize;
@@ -86,12 +82,7 @@ impl From<Array2<u8>> for RawImage {
 
 impl From<Mat> for Mask {
     fn from(value: Mat) -> Self {
-        let resized = if value.is_continuous() {
-            value
-        } else {
-            // allow:clone[to_contiguous]
-            value.clone()
-        };
+        let resized = to_continous(value);
 
         let size = resized.size().unwrap();
         let rows = size.height as usize;

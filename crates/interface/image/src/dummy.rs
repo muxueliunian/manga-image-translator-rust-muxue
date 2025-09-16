@@ -1,4 +1,4 @@
-use crate::{DimType, ImageOp, Mask, RawImage, RawImageCow, RawImageView};
+use crate::{DimType, ImageOp, Mask, MaskView, RawImage, RawImageCow, RawImageView};
 
 #[derive(Default)]
 pub struct DummyImageProcessor;
@@ -124,7 +124,7 @@ impl ImageOp for DummyImageProcessor {
 
     fn resize_mask(
         &self,
-        _: &Mask,
+        _: MaskView,
         width: usize,
         height: usize,
         _: super::Interpolation,

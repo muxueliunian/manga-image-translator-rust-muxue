@@ -2,7 +2,7 @@ use image::{DynamicImage, RgbaImage};
 use stego::LSBStego;
 
 pub trait Watermark<I, O> {
-    fn custom_text(&self) -> Option<String>;
+    fn custom_text(&self) -> Option<&String>;
     fn text(&self) -> String {
         let name = format!("manga-image-translator {}", env!("CARGO_PKG_VERSION"));
         let url = "https://github.com/frederik-uni/manga-image-translator-rust";
@@ -32,7 +32,7 @@ impl Watermark<DynamicImage, RgbaImage> for LSBWatermark {
         Ok(stego.decode_text())
     }
 
-    fn custom_text(&self) -> Option<String> {
-        self.text.clone()
+    fn custom_text(&self) -> Option<&String> {
+        self.text.as_ref()
     }
 }

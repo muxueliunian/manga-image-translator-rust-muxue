@@ -7,7 +7,7 @@ use interface_image::{ImageOp, Mask};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use interface_ocr::QuadrilateralInfo;
 use maplit::hashmap;
-use ndarray::{s, stack, Array2, Array4, Axis};
+use ndarray::{s, stack, Array4, ArrayView2, Axis};
 use ort::{
     inputs,
     session::{RunOptions, Session},
@@ -102,6 +102,7 @@ impl MangaOCR {
         let sos_idnex = 2;
         let eos_index = 3;
         let special_tokens = 5;
+        // allow:clone[arc]
         let pre = preprocessor(image, img_processor.clone()).await?;
 
         let t = Tensor::from_array(pre)?;
@@ -116,8 +117,8 @@ impl MangaOCR {
 
         let mut token_ids: Vec<i64> = vec![sos_idnex];
         for _ in 0..self.max_length {
-            let input = Array2::from_shape_vec((1, token_ids.len()), token_ids.clone())?;
-            let t = Tensor::from_array(input)?;
+            let input = ArrayView2::from_shape((1, token_ids.len()), &token_ids)?;
+            let t = Tensor::from_array(input.to_owned())?;
 
             let out = models
                 .dec
@@ -151,6 +152,7 @@ impl MangaOCR {
                 .collect::<String>(),
             fg: None,
             bg: None,
+            // allow:clone[arc]
             pos: area.clone(),
             prob: 1.0,
         })
@@ -165,6 +167,7 @@ impl interface_ocr::Ocr for MangaOCR {
         img_processor: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<Vec<interface_ocr::QuadrilateralInfo>> {
         let mut texts = vec![];
+        // allow:clone[arc]
         let image = image.clone();
         let grayscale = spawn_blocking(move || {
             Arc::new(
@@ -176,8 +179,9 @@ impl interface_ocr::Ocr for MangaOCR {
             )
         })
         .await?;
-        for (index, area) in areas.iter().enumerate() {
+        for (_, area) in areas.iter().enumerate() {
             let bbox = area.lock().aabb();
+            // allow:clone[arc]
             let grayscale = grayscale.clone();
             let img = tokio::task::spawn_blocking(move || {
                 let view =
@@ -185,12 +189,8 @@ impl interface_ocr::Ocr for MangaOCR {
                 Mask::from(view.to_image())
             })
             .await?;
-            img.clone()
-                .to_image()
-                .unwrap()
-                .save(format!("ocr_{index}.png"))
-                .unwrap();
 
+            // allow:clone[arc]
             texts.push(self.detect_patch(img, area.clone(), img_processor).await?);
         }
 
@@ -199,13 +199,13 @@ impl interface_ocr::Ocr for MangaOCR {
 }
 
 async fn preprocessor(
-    mut img: Mask,
+    img: Mask,
     img_processor: Arc<dyn ImageOp + Send + Sync>,
 ) -> anyhow::Result<Array4<f32>> {
     //"resample": 2,"size": 224
     spawn_blocking(move || {
         let resized = img_processor.resize_mask(
-            &mut img,
+            img.view(),
             224,
             224,
             interface_image::Interpolation::Bilinear,
