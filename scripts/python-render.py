@@ -239,8 +239,10 @@ async def run_render(
         dispatch_eng_render_pillow,
     )
 
-    if (renderer == "manga2Eng" or renderer == "manga2EngPillow") and text_regions:
-        if renderer == "manga2EngPillow":
+    if (
+        renderer == Renderer.manga2Eng or renderer == Renderer.manga2EngPillow
+    ) and text_regions:
+        if renderer == Renderer.manga2EngPillow:
             output = await dispatch_eng_render_pillow(
                 img_inpainted,
                 rgb_img,
@@ -312,7 +314,7 @@ async def main():
     parser.add_argument(
         "--renderer",
         type=Renderer,
-        default=Renderer.default,
+        default=Renderer.manga2EngPillow,
         choices=list(Renderer),
         help="Select the renderer.",
     )
