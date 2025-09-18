@@ -9,3 +9,4 @@ hashes
 *.py
 models/
 dist
+*.mit.bin

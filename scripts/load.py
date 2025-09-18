@@ -1,6 +1,7 @@
 import struct
 import numpy as np
 import PIL
+from enum import Enum
 
 try:
     import mit_renderer
@@ -210,10 +211,82 @@ def load_export(data: bytes) -> Export:
     return export
 
 
-def main():
+class Renderer(str, Enum):
+    default = "default"
+    manga2Eng = "manga2eng"
+    manga2EngPillow = "manga2eng_pillow"
+
+
+async def run_render(
+    renderer,
+    text_regions,
+    rgb_img,
+    img_inpainted,
+    font_path,
+    line_spacing,
+    no_hyphenation,
+    font_size,
+    font_size_offset,
+    font_size_minimum,
+):
+    from mit_renderer import (
+        dispatch as dispatch_rendering,
+        dispatch_eng_render,
+        dispatch_eng_render_pillow,
+    )
+
+    if (renderer == "manga2Eng" or renderer == "manga2EngPillow") and text_regions:
+        if renderer == "manga2EngPillow":
+            output = await dispatch_eng_render_pillow(
+                img_inpainted,
+                rgb_img,
+                text_regions,
+                font_path,
+                line_spacing,
+            )
+        else:
+            output = await dispatch_eng_render(
+                img_inpainted,
+                rgb_img,
+                text_regions,
+                font_path,
+                line_spacing,
+            )
+    else:
+        output = await dispatch_rendering(
+            img_inpainted,
+            text_regions,
+            font_path,
+            font_size,
+            font_size_offset,
+            font_size_minimum,
+            not no_hyphenation,
+            None,
+            line_spacing,
+        )
+    return output
+
+
+async def main():
     import argparse
     from pathlib import Path
     import logging
+    from urllib.parse import unquote
+    import os
+
+    def url_decode(s):
+        s = unquote(s)
+        if s.startswith("file:///"):
+            s = s[len("file://") :]
+        return s
+
+    def file_path(string):
+        if not string:
+            return ""
+        s = url_decode(os.path.expanduser(string))
+        if not os.path.exists(s):
+            raise argparse.ArgumentTypeError(f'No such file: "{string}"')
+        return s
 
     parser = argparse.ArgumentParser(
         description="Load and log an Export from a binary file."
@@ -232,6 +305,31 @@ def main():
         required=True,
         help="Filepath/filename to save the rendered image to",
     )
+    parser.add_argument(
+        "--renderer",
+        type=Renderer,
+        default=Renderer.default,
+        choices=list(Renderer),
+        help="Select the renderer.",
+    )
+    parser.add_argument(
+        "--font-path", default="", type=file_path, help="Path to font file"
+    )
+    parser.add_argument(
+        "--line_spacing", type=int, default=None, help="Line spacing in pixels."
+    )
+    parser.add_argument(
+        "--no_hyphenation", action="store_true", help="Disable hyphenation."
+    )
+    parser.add_argument(
+        "--font_size", type=int, default=None, help="Font size in points."
+    )
+    parser.add_argument(
+        "--font_size_offset", type=int, default=0, help="Offset to apply to font size."
+    )
+    parser.add_argument(
+        "--font_size_minimum", type=int, default=-1, help="Minimum font size allowed."
+    )
     args = parser.parse_args()
 
     # Configure logging
@@ -247,8 +345,9 @@ def main():
 
     export = load_export(data)
     img = export.img.data
-
-    for i, patch in enumerate(export.patches, start=1):
+    orig_rgb_img = img.copy()[..., :3]
+    blocks = []
+    for patch in export.patches:
         patch: Patch
         x = patch.pos[0]
         y = patch.pos[1]
@@ -266,13 +365,28 @@ def main():
         block = mit_renderer.TextBlock(
             patch.info.lines,
             [patch.info.text],
+            translation=patch.info.translations.get("translated"),
             font_size=patch.info.font_size,
             angle=patch.info.angle,
             prob=patch.info.lines,
             fg_color=fg_color,
             bg_color=bg_color,
         )
-        print(block)
+        blocks.append(block)
+
+    img_inpainted = img[..., :3]
+    img = await run_render(
+        args.renderer,
+        blocks,
+        orig_rgb_img,
+        img_inpainted,
+        args.font_path,
+        args.line_spacing,
+        args.no_hyphenation,
+        args.font_size,
+        args.font_size_offset,
+        args.font_size_minimum,
+    )
 
     image = PIL.Image.fromarray(img)
 
@@ -280,4 +394,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+
+    asyncio.run(main())
