@@ -20,11 +20,11 @@ class ImageOverlayManager {
   createOverlayElement(overlay) {
     const div = document.createElement("div");
     div.className = "text-box";
-    div.textContent = overlay.ocrText;
+    div.textContent = overlay.text;
     div.style.backgroundImage = `url('${overlay.background}')`;
 
     this.updateOverlayPosition(overlay, div);
-    $(div).fitText(0.5);
+    // $(div).fitText(0.5);
     return div;
   }
 
@@ -32,10 +32,10 @@ class ImageOverlayManager {
     const scaleX = this.image.clientWidth / this.image.naturalWidth;
     const scaleY = this.image.clientHeight / this.image.naturalHeight;
 
-    element.style.left = overlay.minX * scaleX + "px";
-    element.style.top = overlay.minY * scaleY + "px";
-    element.style.width = (overlay.maxX - overlay.minX) * scaleX + "px";
-    element.style.height = (overlay.maxY - overlay.minY) * scaleY + "px";
+    element.style.left = overlay.x * scaleX + "px";
+    element.style.top = overlay.y * scaleY + "px";
+    element.style.width = overlay.width * scaleX + "px";
+    element.style.height = overlay.height * scaleY + "px";
   }
 
   initializeOverlays() {

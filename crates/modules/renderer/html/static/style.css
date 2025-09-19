@@ -61,4 +61,15 @@ body {
     font-family: var(--ui-font-family);
     color: var(--text-color);
     overflow-wrap: break-word;
+
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-break: keep-all;
+    hyphens: auto;
+    text-align: center;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+
+    overflow: visible;
 }

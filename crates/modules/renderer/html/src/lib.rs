@@ -77,7 +77,7 @@ impl HtmlRenderer {
             html.push(generate(font.clone(), jsons, index, img, archive));
         }
         html.push("<!--<script>var maxWidth = 300;</script> -->".to_owned());
-        html.push(r#"<script src="/lazyInit.js" defer></script>"#.to_owned());
+        html.push(r#"<script src="./lazyInit.js" defer></script>"#.to_owned());
         (html.join("\n").as_bytes().to_vec(), archive)
     }
 }

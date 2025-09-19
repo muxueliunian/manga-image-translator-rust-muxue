@@ -16,12 +16,12 @@ if (typeof inited === "undefined") {
 
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "/style.css";
+    link.href = "./style.css";
     document.head.appendChild(link);
 
     fitTextScript.onload = () => {
       const script = document.createElement("script");
-      script.src = "/script.js";
+      script.src = "./script.js";
       document.head.appendChild(script);
     };
 
