@@ -7,7 +7,7 @@ mod textline_merge;
 mod translator;
 mod upscaler;
 
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, ptr, sync::Arc};
 
 use export::Export;
 use image::DynamicImage;
@@ -29,7 +29,6 @@ impl Models {
         debug_path: Option<PathBuf>,
     ) -> anyhow::Result<Export> {
         let ip = Arc::new(CpuImageProcessor::default()) as ImageProcessor;
-        let orig_img = img.clone();
         let (img, alpha) = RawImage::rgba(img);
         let (img, alpha) = self.run_upscaler(img, alpha, config.upscaler, &ip)?;
 
@@ -46,9 +45,11 @@ impl Models {
         }
 
         let areas = areas.into_iter().map(to_mutex).collect::<Vec<_>>();
-        let img = Arc::new(img);
+        let upscaled_img = Arc::new(img);
 
-        let textlines = self.run_ocr(&img, &areas, &config.ocr, &ip).await?;
+        let textlines = self
+            .run_ocr(&upscaled_img, &areas, &config.ocr, &ip)
+            .await?;
 
         if let Some(debug_path) = &debug_path {
             save_json(&textlines, &debug_path.join("2_quadrilateral.json"))?;
@@ -56,8 +57,8 @@ impl Models {
 
         let textblocks = self.run_textline_merge(
             &textlines,
-            img.width,
-            img.height,
+            upscaled_img.width,
+            upscaled_img.height,
             &config.ocr,
             &config.translator,
         )?;
@@ -85,26 +86,39 @@ impl Models {
             )?;
         }
 
-        let mask_refined =
-            Models::run_mask_refinement(&img, &mask, &textblocks, &config.mask_refinement, &ip)?;
+        let mask_refined = Models::run_mask_refinement(
+            &upscaled_img,
+            &mask,
+            &textblocks,
+            &config.mask_refinement,
+            &ip,
+        )?;
 
         if let Some(debug_path) = &debug_path {
             save_mask(&mask_refined, &debug_path.join("4_mask_refined.png"))?;
         }
 
-        let inpainted = self.run_inpainter(&img, mask_refined, &config.inpainter, &ip)?;
+        let (inpainted, mask) =
+            self.run_inpainter(&upscaled_img, mask, mask_refined, &config.inpainter, &ip)?;
 
+        let inpainted = inpainted.add_a(mask.data);
         if let Some(debug_path) = &debug_path {
-            save_img(&inpainted, &debug_path.join("5_inpainted.png"))?;
+            let mut img = upscaled_img.as_ref().clone();
+            img.apply_filter(&inpainted, |a, b| unsafe {
+                if *b.get_unchecked(3) > 128 {
+                    ptr::copy_nonoverlapping(b.as_ptr(), a.as_mut_ptr(), 3);
+                }
+            });
+            save_img(&img, &debug_path.join("5_inpainted.png"))?;
         }
 
         Ok(Export::new(
-            orig_img,
             match alpha {
-                Some(a) => inpainted.add_a(a),
-                None => inpainted,
+                Some(a) => upscaled_img.as_ref().clone().add_a(a),
+                None => upscaled_img.as_ref().clone(),
             }
             .to_image()?,
+            inpainted.to_image()?,
             textblocks,
             None,
         ))

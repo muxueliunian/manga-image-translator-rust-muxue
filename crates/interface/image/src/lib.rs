@@ -199,6 +199,7 @@ impl RawImage {
             result.push(val);
         }
         self.data = result;
+        self.channels = 4;
         self
     }
 
@@ -254,6 +255,15 @@ impl RawImage {
                 }
             }
         }
+    }
+
+    pub fn apply_filter(&mut self, other: &Self, func: fn(&mut [u8], &[u8])) {
+        assert_eq!(self.width, other.width);
+        assert_eq!(self.height, other.height);
+        self.data
+            .chunks_mut(self.channels as usize)
+            .zip(other.data.chunks(other.channels as usize))
+            .for_each(|v| func(v.0, v.1));
     }
 
     pub fn apply(self, other: Self) -> Self {
@@ -636,6 +646,8 @@ pub trait ImageOp {
 
     fn remove_border_mask(&self, mask: Mask, width: DimType, height: DimType) -> Mask;
     fn bgr_to_rgb(&self, img: RawImage) -> RawImage;
+
+    fn mask_func(&self, mask1: Mask, mask2: Mask, func: fn(u8, u8) -> u8) -> Mask;
 }
 pub enum Interpolation {
     Nearest,

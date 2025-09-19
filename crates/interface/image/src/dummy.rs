@@ -170,4 +170,8 @@ impl ImageOp for DummyImageProcessor {
             channels: 3,
         })
     }
+
+    fn mask_func(&self, mask1: Mask, _: Mask, _: fn(u8, u8) -> u8) -> Mask {
+        mask1
+    }
 }

@@ -1,5 +1,4 @@
 use interface_image::{Mask, RawImage};
-use mask_refinement::Method;
 use textline_merge::TextBlock;
 
 use crate::{execute::ImageProcessor, settings::MaskRefinementSettings, setup::Models};

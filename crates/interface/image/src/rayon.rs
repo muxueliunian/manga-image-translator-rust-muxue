@@ -7,7 +7,7 @@ use fast_image_resize::{
 use rayon::{
     iter::{
         IndexedParallelIterator as _, IntoParallelIterator as _, IntoParallelRefIterator as _,
-        ParallelIterator as _,
+        IntoParallelRefMutIterator as _, ParallelIterator as _,
     },
     slice::{ParallelSlice as _, ParallelSliceMut as _},
 };
@@ -583,5 +583,19 @@ impl ImageOp for RayonImageProcessor {
         });
 
         img
+    }
+
+    fn mask_func(&self, mut mask1: Mask, mask2: Mask, func: fn(u8, u8) -> u8) -> Mask {
+        assert_eq!(mask1.data.len(), mask2.data.len());
+
+        mask1
+            .data
+            .par_iter_mut()
+            .zip(mask2.data.par_iter())
+            .for_each(|(a, &b)| {
+                *a = func(*a, b);
+            });
+
+        mask1
     }
 }

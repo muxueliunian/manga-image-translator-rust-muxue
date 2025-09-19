@@ -509,4 +509,14 @@ impl ImageOp for CpuImageProcessor {
         }
         img
     }
+
+    fn mask_func(&self, mut mask1: Mask, mask2: Mask, func: fn(u8, u8) -> u8) -> Mask {
+        assert_eq!(mask1.data.len(), mask2.data.len());
+        mask1
+            .data
+            .iter_mut()
+            .zip(mask2.data)
+            .for_each(|(a, b)| *a = func(*a, b));
+        mask1
+    }
 }
