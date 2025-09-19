@@ -33,7 +33,8 @@
           255
         ],
         "inpainter": "LamaAot",
-        "inpainting_size": 2048
+        "inpainting_size": 2048,
+        "mask": "RefinedMask"
       }
     },
     "mask_refinement": {
@@ -61,7 +62,9 @@
     "render": {
       "description": "Settings for the render module",
       "$ref": "#/$defs/RenderSettings",
-      "default": {}
+      "default": {
+        "renderer": "Html"
+      }
     },
     "translator": {
       "description": "Settings for the translator module",
@@ -194,6 +197,11 @@
           "default": 2048,
           "maximum": 65535,
           "minimum": 0
+        },
+        "mask": {
+          "description": "this is not the mask that is given to the inpainter, but what part of the inpainted image should be extracted(overlayed on the orignal image)",
+          "$ref": "#/$defs/Mask",
+          "default": "RefinedMask"
         }
       }
     },
@@ -2307,6 +2315,25 @@
         }
       ]
     },
+    "Mask": {
+      "oneOf": [
+        {
+          "description": "The detected mask needs to be refined to remove artifacts when inpainting. Its alsmost a perfect match to the actual letters, but does contain some noise",
+          "type": "string",
+          "const": "Mask"
+        },
+        {
+          "description": "The refined mask is used for inpainting, but a bit more dilated & without the noise",
+          "type": "string",
+          "const": "RefinedMask"
+        },
+        {
+          "description": "this is cuts out the parts which are in both mask and refined mask(filters noise)",
+          "type": "string",
+          "const": "Both"
+        }
+      ]
+    },
     "MaskRefinementSettings": {
       "type": "object",
       "properties": {
@@ -2422,7 +2449,20 @@
       }
     },
     "RenderSettings": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "renderer": {
+          "$ref": "#/$defs/Renderer",
+          "default": "Html"
+        }
+      }
+    },
+    "Renderer": {
+      "type": "string",
+      "enum": [
+        "Raw",
+        "Html"
+      ]
     },
     "SingleOrMultiple": {
       "anyOf": [

@@ -1,1 +1,44 @@
-{"upscaler":{"upscaler":null,"patch_size":null,"padding":0},"detector":{"detector":"DBNet","preprocessor":{"invert":false,"gamma_correct":false,"rotate":false,"auto_rotate":false},"options":{"detect_size":2048,"unclip_ratio":2.3,"text_threshold":0.5,"box_threshold":0.7}},"ocr":{"ocr":"Ocr48px","use_mocr_merge":false,"min_text_length":1,"filter_text":[],"prob":0.2},"mask_refinement":{"ignore_bubble":0,"dilation_offset":20.0,"kernel_size":3,"furigana":false,"method":"FitText"},"inpainter":{"inpainter":"LamaAot","inpainting_size":2048,"inpaint_color":[255,255,255]},"translator":{"target":{"translator":"Sugoi","target":"en"},"filter_lang":[],"pre_dict":null},"render":{}}
+{
+  "upscaler": { "upscaler": null, "patch_size": null, "padding": 0 },
+  "detector": {
+    "detector": "DBNet",
+    "preprocessor": {
+      "invert": false,
+      "gamma_correct": false,
+      "rotate": false,
+      "auto_rotate": false
+    },
+    "options": {
+      "detect_size": 2048,
+      "unclip_ratio": 2.3,
+      "text_threshold": 0.5,
+      "box_threshold": 0.7
+    }
+  },
+  "ocr": {
+    "ocr": "Ocr48px",
+    "use_mocr_merge": false,
+    "min_text_length": 1,
+    "filter_text": [],
+    "prob": 0.2
+  },
+  "mask_refinement": {
+    "ignore_bubble": 0,
+    "dilation_offset": 20.0,
+    "kernel_size": 3,
+    "furigana": false,
+    "method": "FitText"
+  },
+  "inpainter": {
+    "inpainter": "LamaAot",
+    "inpainting_size": 2048,
+    "inpaint_color": [255, 255, 255],
+    "mask": "RefinedMask"
+  },
+  "translator": {
+    "target": { "translator": "Sugoi", "target": "en" },
+    "filter_lang": [],
+    "pre_dict": null
+  },
+  "render": { "renderer": "Html" }
+}
