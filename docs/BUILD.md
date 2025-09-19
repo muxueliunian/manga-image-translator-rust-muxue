@@ -25,7 +25,12 @@ choco install opencv llvm
 $env:OPENCV_LINK_LIBS = $libName # opencv_world*.lib. Its the only .lib file in the C:\tools\opencv if you use the prebuilts
 $env:OPENCV_LINK_PATHS = $libPath # the parent folder of the opencv_world*.lib file. maybe "C:\tools\opencv\build\x64\vc16\lib"
 $env:OPENCV_INCLUDE_PATHS = $includePath # most likely "C:\tools\opencv\build\include"
+$env:Path = "C:\tools\opencv\build\x64\vc16\bin;" + $env:Path
+
 ```
+
+[Path to long error 1](https://stackoverflow.com/questions/22575662/filename-too-long-in-git-for-windows)
+[Path to long error 2](https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=registry)
 
 ## Quick Start
 ```sh

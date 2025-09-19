@@ -7,7 +7,7 @@ use std::{
 use clap::Parser as _;
 use config::Config;
 use html::HtmlRenderer;
-use log::{error, warn};
+use log::{error, info, warn};
 use walkdir::WalkDir;
 
 use crate::{
@@ -28,11 +28,10 @@ mod update;
 #[tokio::main]
 async fn main() {
     let ui = std::env::args().count() == 1;
+    env_logger::Builder::new()
+        .filter(None, log::LevelFilter::Info)
+        .init();
     if ui {
-        env_logger::Builder::new()
-            .filter(None, log::LevelFilter::Info)
-            .init();
-
         let native_options = eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
                 .with_inner_size([400.0, 300.0])
@@ -96,6 +95,7 @@ async fn main() {
     }
     let mut models = Models::new(2, true, false).await;
     for path in input {
+        info!("Processing {}", path.display());
         let mut output = cli.output.join(&path);
         let path = cli.input.join(path);
         if !path.exists() || !path.is_file() {
