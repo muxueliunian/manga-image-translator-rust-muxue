@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 pub use crate::settings::{
     detector::Detector, detector::DetectorSettings, inpainter::Inpainter,
     inpainter::InpainterSettings, inpainter::Mask, mask_refinement::MaskRefinementSettings,
-    ocr::OCRSettings, ocr::OCR, render::RenderSettings, translator::Target,
+    ocr::OCRSettings, ocr::OCR, render::RenderSettings, render::Renderer, translator::Target,
     translator::Translation, translator::Translator, translator::TranslatorSettings,
     upscaler::Upscaler, upscaler::UpscalerSettings,
 };

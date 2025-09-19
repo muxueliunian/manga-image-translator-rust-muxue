@@ -36,7 +36,9 @@ impl Patch {
 
 impl Export {
     pub fn export(self) -> Vec<u8> {
-        let mut buffer = self.img.export();
+        let mut buffer = b"mit-rust:".to_vec();
+        buffer.extend(1_u32.to_le_bytes());
+        buffer.extend(self.img.export());
         buffer.extend((self.patches.len() as u64).to_le_bytes());
         for patch in self.patches {
             buffer.extend(patch.export())

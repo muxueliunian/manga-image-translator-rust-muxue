@@ -6,10 +6,15 @@ use std::{
 
 use clap::Parser as _;
 use config::Config;
+use html::HtmlRenderer;
 use log::{error, warn};
 use walkdir::WalkDir;
 
-use crate::{settings::Settings, setup::Models, update::check_crate_version};
+use crate::{
+    settings::{Renderer, Settings},
+    setup::Models,
+    update::check_crate_version,
+};
 
 pub mod cli;
 mod debug;
@@ -113,12 +118,23 @@ async fn main() {
             None
         };
         let exp = models.execute(img, &settings, debug_path).await.unwrap();
-        let bin = exp.export();
-        output.set_extension("mit.bin");
-        if let Some(parent) = output.parent() {
-            create_dir_all(parent).expect("Failed to create parent directory");
+        if settings.render.renderer == Renderer::Html {
+            let (data, _) = HtmlRenderer::render(vec![exp], None, false);
+            output.set_extension("html");
+            if let Some(parent) = output.parent() {
+                create_dir_all(parent).expect("Failed to create parent directory");
+                html::copy_files(parent).expect("Failed to copy important js files");
+            }
+            File::create(output).unwrap().write_all(&data).unwrap();
+        } else {
+            let bin = exp.export();
+            output.set_extension("mit.bin");
+            if let Some(parent) = output.parent() {
+                create_dir_all(parent).expect("Failed to create parent directory");
+            }
+            File::create(output).unwrap().write_all(&bin).unwrap();
         }
-        File::create(output).unwrap().write_all(&bin).unwrap();
+
         //TODO: from config
         // renderer.render(
         //     exp,

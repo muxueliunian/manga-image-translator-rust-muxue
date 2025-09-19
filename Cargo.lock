@@ -3046,6 +3046,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "html"
+version = "0.10.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "export",
+ "image",
+ "interface-image",
+ "serde",
+ "serde_json",
+ "v_htmlescape",
+]
+
+[[package]]
 name = "html5ever"
 version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6572,6 +6586,7 @@ dependencies = [
  "env_logger 0.11.8",
  "esrgan",
  "export",
+ "html",
  "image",
  "imageproc",
  "interface-detector",
@@ -7734,6 +7749,12 @@ dependencies = [
  "num-traits",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "v_htmlescape"
+version = "0.15.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4e8257fbc510f0a46eb602c10215901938b5c2a7d5e70fc11483b1d3c9b5b18c"
 
 [[package]]
 name = "vcpkg"

@@ -1,10 +1,22 @@
-# Binary Data Structure
+# Binary Data Structure Version 1
 
 > **Note:**
 >
 > - All numbers are **little-endian**.
 > - `n` indicates a previously read length.
 > - `?` means variable size (compute from other definitions).
+
+---
+
+## **Export**
+
+| Size | Type   | Description       |
+| ---- | ------ | ----------------- |
+| 9    | \_     | unknown/reserved  |
+| 4    | `uint` | version           |
+| ?    | Image  | embedded Image    |
+| 8    | `uint` | number of patches |
+| ?×n  | Patch  | n patches         |
 
 ---
 
@@ -61,11 +73,3 @@
 | ?    | TextBlock | embedded TextBlock |
 
 ---
-
-## **Export**
-
-| Size | Type   | Description       |
-| ---- | ------ | ----------------- |
-| ?    | Image  | embedded Image    |
-| 8    | `uint` | number of patches |
-| ?×n  | Patch  | n patches         |

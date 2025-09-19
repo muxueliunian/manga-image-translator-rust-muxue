@@ -30,6 +30,7 @@ parking_lot.workspace = true
 tesseract.workspace = true
 schemars.workspace = true
 ocr-48px.workspace = true
+html.workspace = true
 
 strum = "0.27.2"
 strum_macros = "0.27.2"

@@ -71,6 +71,7 @@ tesseract = { path = "crates/modules/ocr/tesseract" }
 native = { path = "crates/modules/ocr/native" }
 ctc-48px = { path = "crates/modules/ocr/ctc-48px" }
 ocr-48px = { path = "crates/modules/ocr/ocr-48px" }
+html = { path = "crates/modules/renderer/html" }
 
 densecrf = { path = "crates/densecrf" }
 show-image = "0.13"
@@ -107,6 +108,9 @@ argminmax = { version = "0.6.3", default-features = false, features = [
     "float",
 ] }
 schemars = "1.0.4"
+v_htmlescape = "0.15.8"
+base64 = "0.22.1"
+zip = "5.1.1"
 
 [patch.crates-io]
 clipper2c-sys = { git = "https://github.com/tirithen/clipper2c-sys" }
