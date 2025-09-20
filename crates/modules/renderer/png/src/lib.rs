@@ -268,17 +268,17 @@ impl PngRenderer {
         let mut dst = Mat::default();
         let k = (font_size as f32 / 12.0).ceil() as i32;
 
-        gaussian_blur(
-            &src,
-            &mut dst,
-            Size::new(2 * k + 1, 2 * k + 1),
-            0.0,
-            0.0,
-            BORDER_DEFAULT,
-            #[cfg(not(target_os = "linux"))]
-            opencv::core::AlgorithmHint::ALGO_HINT_DEFAULT,
-        )
-        .unwrap();
+        // gaussian_blur(
+        //     &src,
+        //     &mut dst,
+        //     Size::new(2 * k + 1, 2 * k + 1),
+        //     0.0,
+        //     0.0,
+        //     BORDER_DEFAULT,
+        //     #[cfg(not(target_os = "linux"))]
+        //     opencv::core::AlgorithmHint::ALGO_HINT_DEFAULT,
+        // )
+        // .unwrap();
 
         let text = RawImage {
             width: w as DimType,
