@@ -2,6 +2,8 @@
 
 ### Preperation All
 Install rust with [rustup](https://rustup.rs)
+Install [cuda](https://developer.nvidia.com/cuda-12-9-0-download-archive)
+Install [cudnn](https://developer.nvidia.com/cudnn-downloads)
 
 ### Preparation Ubuntu/Debian
 ```sh
