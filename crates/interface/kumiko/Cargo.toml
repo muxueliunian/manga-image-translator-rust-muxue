@@ -1,0 +1,10 @@
+[package]
+name = "kumiko"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+image.workspace = true
+opencv = { workspace = true, features=["imgproc"] }
+itertools.workspace = true
+ordered-float.workspace = true
