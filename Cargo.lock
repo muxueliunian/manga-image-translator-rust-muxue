@@ -69,7 +69,7 @@ dependencies = [
 [[package]]
 name = "aio-translator"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-baidu",
  "aio-translator-caiyun",
@@ -87,6 +87,7 @@ dependencies = [
  "aio-translator-papago",
  "aio-translator-sugoi",
  "aio-translator-youdao",
+ "anyhow",
  "arabic_reshaper",
  "async-trait",
  "ct2rs",
@@ -97,9 +98,10 @@ dependencies = [
 [[package]]
 name = "aio-translator-baidu"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
+ "anyhow",
  "async-trait",
  "md5",
  "reqwest",
@@ -110,9 +112,10 @@ dependencies = [
 [[package]]
 name = "aio-translator-caiyun"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
+ "anyhow",
  "async-trait",
  "reqwest",
  "serde",
@@ -121,7 +124,7 @@ dependencies = [
 [[package]]
 name = "aio-translator-deepl"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
  "anyhow",
@@ -134,9 +137,10 @@ dependencies = [
 [[package]]
 name = "aio-translator-google"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
+ "anyhow",
  "async-trait",
  "reqwest",
  "serde",
@@ -146,7 +150,7 @@ dependencies = [
 [[package]]
 name = "aio-translator-interface"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-lang-generator",
  "anyhow",
@@ -161,7 +165,7 @@ dependencies = [
 [[package]]
 name = "aio-translator-jparacrawl"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
  "anyhow",
@@ -176,7 +180,7 @@ dependencies = [
 [[package]]
 name = "aio-translator-lang-generator"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "csv",
  "heck 0.5.0",
@@ -193,7 +197,7 @@ dependencies = [
 [[package]]
 name = "aio-translator-langid"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
  "langid-rs",
@@ -202,7 +206,7 @@ dependencies = [
 [[package]]
 name = "aio-translator-m2m100"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
  "anyhow",
@@ -216,7 +220,7 @@ dependencies = [
 [[package]]
 name = "aio-translator-mbart50"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
  "anyhow",
@@ -230,9 +234,10 @@ dependencies = [
 [[package]]
 name = "aio-translator-mymemory"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
+ "anyhow",
  "async-trait",
  "reqwest",
  "scraper",
@@ -242,7 +247,7 @@ dependencies = [
 [[package]]
 name = "aio-translator-nllb"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
  "anyhow",
@@ -256,27 +261,30 @@ dependencies = [
 [[package]]
 name = "aio-translator-none"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
+ "anyhow",
  "reqwest",
 ]
 
 [[package]]
 name = "aio-translator-original"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
+ "anyhow",
  "reqwest",
 ]
 
 [[package]]
 name = "aio-translator-papago"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
+ "anyhow",
  "async-trait",
  "base64 0.22.1",
  "hmac",
@@ -290,7 +298,7 @@ dependencies = [
 [[package]]
 name = "aio-translator-sugoi"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
  "anyhow",
@@ -305,9 +313,10 @@ dependencies = [
 [[package]]
 name = "aio-translator-youdao"
 version = "1.0.0"
-source = "git+https://github.com/frederik-uni/aio-translator#2b7b1240269993f2e5322ab0f365f057050a1762"
+source = "git+https://github.com/frederik-uni/aio-translator#230ce0666f6ed34e97ecfd1bb3459ed4920f71e0"
 dependencies = [
  "aio-translator-interface",
+ "anyhow",
  "async-trait",
  "hex",
  "rand 0.9.2",
@@ -797,7 +806,7 @@ dependencies = [
 [[package]]
 name = "base-util"
 version = "0.10.0"
-source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#721250cdf2a139ecaadbc7881fcc88823bac82e3"
+source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#37e562418ca4b6e5b503edc691d4276f7e0a116a"
 dependencies = [
  "anyhow",
  "ndarray",
@@ -1156,9 +1165,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.47"
+version = "4.5.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7eac00902d9d136acd712710d71823fb8ac8004ca445a89e73a41d45aa712931"
+checksum = "e2134bb3ea021b78629caa971416385309e0131b351b25e01dc16fb54e1b5fae"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -1166,9 +1175,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.47"
+version = "4.5.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ad9bbf750e73b5884fb8a211a9424a1906c1e156724260fdae972f31d70e1d6"
+checksum = "c2ba64afa3c0a6df7fa517765e31314e983f51dda798ffba27b988194fb65dc9"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1464,7 +1473,7 @@ dependencies = [
  "anes",
  "cast",
  "ciborium",
- "clap 4.5.47",
+ "clap 4.5.48",
  "criterion-plot",
  "itertools 0.13.0",
  "num-traits",
@@ -1670,7 +1679,7 @@ version = "1.0.185"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd46bf2b541a4e0c2d5abba76607379ee05d68e714868e3cb406dc8d591ce2d2"
 dependencies = [
- "clap 4.5.47",
+ "clap 4.5.48",
  "codespan-reporting",
  "indexmap",
  "proc-macro2 1.0.101",
@@ -3549,7 +3558,7 @@ dependencies = [
 [[package]]
 name = "interface-model"
 version = "0.10.0"
-source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#721250cdf2a139ecaadbc7881fcc88823bac82e3"
+source = "git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master#37e562418ca4b6e5b503edc691d4276f7e0a116a"
 dependencies = [
  "anyhow",
  "base-util 0.10.0 (git+https://github.com/frederik-uni/manga-image-translator-rust?branch=master)",
@@ -5521,9 +5530,9 @@ checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "pxfm"
-version = "0.1.23"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f55f4fedc84ed39cb7a489322318976425e42a147e2be79d8f878e2884f94e84"
+checksum = "83f9b339b02259ada5c0f4a389b7fb472f933aa17ce176fd2ad98f28bb401fde"
 dependencies = [
  "num-traits",
 ]
@@ -6576,7 +6585,7 @@ dependencies = [
  "anime4k",
  "anyhow",
  "base-util 0.10.0",
- "clap 4.5.47",
+ "clap 4.5.48",
  "config",
  "ctc-48px",
  "ctd",
