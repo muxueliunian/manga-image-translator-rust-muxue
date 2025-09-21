@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use anyhow::anyhow;
 use interface_translator::Detector;
-use interface_translator::{Language, TranslationListOutput};
+use interface_translator::TranslationListOutput;
+use log::info;
 use textline_merge::TextBlock;
 
 use crate::{
@@ -72,6 +71,7 @@ impl Models {
         input: TranslationListOutput,
         translator_info: &Translation,
     ) -> anyhow::Result<TranslationListOutput> {
+        info!("Run Translator: {:?}", translator_info.translator);
         let to = translator_info.target.0;
         let translator = self.get_translator(translator_info.translator);
         let translations = if translator.local() {

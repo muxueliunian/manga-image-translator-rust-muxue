@@ -31,7 +31,7 @@ runs:
       if: inputs.runs-on == 'macos-latest' || inputs.runs-on == 'macos-13'
       shell: bash
       run: |
-        export OPENCV_LINK_LIBS=+static=opencv_core,static=opencv_imgproc,static=opencv_calib3d,static=libtegra_hal,tbb,static=ittnotify,framework=OpenCL,z
+        export OPENCV_LINK_LIBS=+static=opencv_core,static=opencv_imgproc,static=opencv_calib3d,static=libtegra_hal,static=tbb,static=ittnotify,framework=OpenCL,z
         cargo build --release -p simple-runtime
     - name: Build release
       if: inputs.runs-on != 'macos-latest' && inputs.runs-on != 'macos-13'

@@ -1,4 +1,5 @@
 use interface_image::{Mask, RawImage};
+use log::info;
 use textline_merge::TextBlock;
 
 use crate::{execute::ImageProcessor, settings::MaskRefinementSettings, setup::Models};
@@ -12,6 +13,7 @@ impl Models {
         img_processor: &ImageProcessor,
     ) -> anyhow::Result<Mask> {
         assert!(!textblocks.is_empty());
+        info!("Run Mask Refinement: {:?}", config.method);
         mask_refinement::dispatch(
             &textblocks,
             &img,

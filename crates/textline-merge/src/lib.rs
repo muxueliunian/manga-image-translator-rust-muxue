@@ -1,13 +1,14 @@
 use std::{
     collections::{HashMap, HashSet},
     f64::consts::PI,
+    sync::Arc,
 };
 
 use anyhow::anyhow;
 use geo::{ConvexHull, Distance as _, Euclidean, MinimumRotatedRect, MultiPoint, Point};
-use interface_detector::textlines::MyPoint;
+use interface_detector::textlines::{MyPoint, Quadrilateral};
 use interface_ocr::QuadrilateralInfo;
-use interface_translator::{is_valuable_text, Detector, Language, LanguageWrapper};
+use interface_translator::{is_valuable_text, Detector, LangIdDetector, Language, LanguageWrapper};
 use itertools::Itertools as _;
 use log::info;
 use once_cell::sync::Lazy;
@@ -305,7 +306,7 @@ impl TextBlock {
         }
     }
 
-    pub fn min_rect(&self) -> anyhow::Result<Vec<[(i64, i64); 4]>> {
+    pub fn min_rect(&self) -> anyhow::Result<[(i64, i64); 4]> {
         let polygons = self.unrotated_polygons();
         let (min_x, min_y, max_x, max_y) =
             compute_bounds(&polygons).ok_or(anyhow::anyhow!("Failed to compute bounds"))?;
@@ -313,18 +314,14 @@ impl TextBlock {
         if self.angle != 0.0 {
             min_bbox = rotate_polygons(self.center(), min_bbox, (-self.angle) as f32, None);
         }
-        Ok(min_bbox
-            .into_iter()
-            .map(|bbox| {
-                let clipped: Vec<i64> = bbox.iter().map(|&x| x.max(0)).collect();
-                [
-                    (clipped[0], clipped[1]),
-                    (clipped[2], clipped[3]),
-                    (clipped[4], clipped[5]),
-                    (clipped[6], clipped[7]),
-                ]
-            })
-            .collect())
+        let min_bbox = min_bbox.remove(0);
+        let clipped: Vec<i64> = min_bbox.iter().map(|&x| x.max(0)).collect();
+        Ok([
+            (clipped[0], clipped[1]),
+            (clipped[2], clipped[3]),
+            (clipped[4], clipped[5]),
+            (clipped[6], clipped[7]),
+        ])
     }
     pub fn xyxy(&self) -> (i64, i64, i64, i64) {
         let x = self
@@ -513,6 +510,14 @@ fn split_text_region(
     }
 
     let edges: Vec<_> = min_spanning_tree(&graph).collect();
+    let idx_map = edges
+        .iter()
+        .filter_map(|v| match v {
+            Element::Node { weight } => Some(*weight),
+            Element::Edge { .. } => None,
+        })
+        .enumerate()
+        .collect::<HashMap<_, _>>();
 
     let mut edges = edges
         .into_iter()
@@ -521,7 +526,11 @@ fn split_text_region(
                 weight,
                 source,
                 target,
-            } => Some((source, target, weight)),
+            } => Some((
+                *idx_map.get(&source).unwrap(),
+                *idx_map.get(&target).unwrap(),
+                weight,
+            )),
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -735,4 +744,36 @@ fn remove_leading_spaces_after_predict(stripped_text: &str) -> String {
         );
     }
     new_stripped_text
+}
+
+#[test]
+fn testssss() {
+    let v: Vec<_> = [
+        [[412_i64, 4634], [591, 4634], [591, 4707], [412, 4707]],
+        [[585, 1987], [795, 1991], [794, 2067], [584, 2063]],
+        [[219, 5258], [445, 5262], [444, 5338], [218, 5334]],
+        [[204, 4492], [437, 4492], [437, 4568], [204, 4568]],
+        [[236, 2976], [542, 2976], [542, 3050], [236, 3050]],
+        [[670, 2263], [970, 2262], [971, 2333], [670, 2335]],
+        [[670, 2121], [968, 2121], [968, 2186], [670, 2186]],
+        [[434, 5499], [806, 5499], [806, 5564], [434, 5564]],
+        [[173, 2908], [603, 2908], [603, 2973], [173, 2973]],
+        [[277, 4708], [722, 4712], [722, 4777], [277, 4773]],
+        [[583, 2194], [1063, 2194], [1063, 2258], [583, 2258]],
+        [[136, 3052], [640, 3052], [640, 3117], [136, 3117]],
+        [[201, 440], [728, 440], [728, 500], [201, 500]],
+        [[334, 5424], [912, 5428], [912, 5493], [334, 5489]],
+    ]
+    .into_iter()
+    .map(|v| Quadrilateral::new(v.into_iter().map(|v| (v[0], v[1])).collect(), 1.0))
+    .map(|v| QuadrilateralInfo {
+        text: "".to_string(),
+        fg: None,
+        bg: None,
+        pos: Arc::new(v.into()),
+        prob: 1.0,
+    })
+    .collect();
+    let d = LangIdDetector::new().unwrap();
+    dispatch(v.iter().collect::<Vec<_>>(), 1080, 6587, &d).unwrap();
 }

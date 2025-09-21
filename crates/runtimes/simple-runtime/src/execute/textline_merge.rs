@@ -1,4 +1,5 @@
 use interface_ocr::QuadrilateralInfo;
+use log::info;
 use textline_merge::TextBlock;
 
 use crate::{
@@ -16,6 +17,7 @@ impl Models {
         config2: &TranslatorSettings,
     ) -> anyhow::Result<Vec<TextBlock>> {
         assert!(!textlines.is_empty());
+        info!("Run Textline Merge");
         textline_merge::dispatch_main(
             textlines,
             width,

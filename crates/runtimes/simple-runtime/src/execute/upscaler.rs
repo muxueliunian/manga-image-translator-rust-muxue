@@ -1,5 +1,6 @@
 use image::{DynamicImage, GrayImage};
 use interface_image::RawImage;
+use log::info;
 
 use crate::{execute::ImageProcessor, settings::UpscalerSettings, setup::Models};
 
@@ -12,6 +13,7 @@ impl Models {
         ip: &ImageProcessor,
     ) -> anyhow::Result<(RawImage, Option<Vec<u8>>)> {
         if let Some(upscaler) = config.upscaler {
+            info!("Run Upscaler: {:?}", upscaler);
             let (h, w) = (rgb_img.height, rgb_img.width);
 
             rgb_img = self.get_upscaler(upscaler).upscale(

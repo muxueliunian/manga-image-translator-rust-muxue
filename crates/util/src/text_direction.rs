@@ -4,33 +4,43 @@ use std::sync::Arc;
 
 use interface_detector::textlines::Quadrilateral;
 use itertools::Itertools;
+use petgraph::graph::NodeIndex;
 use petgraph::unionfind::UnionFind;
-use petgraph::visit::{EdgeRef as _, NodeIndexable as _};
+use petgraph::visit::EdgeRef as _;
 use petgraph::{Graph, Undirected};
 
-pub fn connected_components_sets<N, E>(
-    graph: &Graph<N, E, Undirected>,
-) -> Vec<Vec<petgraph::graph::NodeIndex>> {
-    let mut uf = UnionFind::new(graph.node_bound());
+pub fn connected_components_sets<N, E>(graph: &Graph<N, E, Undirected>) -> Vec<Vec<NodeIndex>> {
+    let node_indices: Vec<_> = graph.node_indices().collect();
+    let mut uf = UnionFind::new(node_indices.len());
+
+    let node_to_idx: HashMap<_, _> = node_indices
+        .iter()
+        .enumerate()
+        .map(|(i, &n)| (n, i))
+        .collect();
 
     for edge in graph.edge_references() {
-        let (a, b) = (edge.source(), edge.target());
-        uf.union(graph.to_index(a), graph.to_index(b));
+        let a = node_to_idx[&edge.source()];
+        let b = node_to_idx[&edge.target()];
+        uf.union(a, b);
     }
 
-    let labels = (0..graph.node_bound())
-        .map(|i| uf.find(i))
-        .collect::<Vec<_>>();
+    let labels: Vec<_> = node_indices
+        .iter()
+        .enumerate()
+        .map(|(i, _)| uf.find(i))
+        .collect();
 
-    let mut groups: HashMap<usize, Vec<petgraph::graph::NodeIndex>> = HashMap::new();
-
-    for node_index in graph.node_indices() {
-        let idx = graph.to_index(node_index);
+    let mut groups: HashMap<usize, Vec<NodeIndex>> = HashMap::new();
+    for &node_index in &node_indices {
+        let idx = node_to_idx[&node_index];
         let label = labels[idx];
         groups.entry(label).or_default().push(node_index);
     }
 
-    groups.into_values().collect()
+    let mut comps: Vec<_> = groups.into_values().collect();
+    comps.sort_by_key(|c| c[0]);
+    comps
 }
 
 pub fn generate_text_direction(

@@ -14,7 +14,7 @@ use image::DynamicImage;
 use interface_image::{CpuImageProcessor, ImageOp, RawImage};
 
 use crate::{
-    debug::{bbox::render_bboxes, save_img, save_json, save_mask},
+    debug::{bbox::render_bboxes, save_img, save_json, save_mask, textblocks::render_textblocks},
     settings::Settings,
     setup::Models,
 };
@@ -75,6 +75,7 @@ impl Models {
 
         if let Some(debug_path) = &debug_path {
             save_json(&textblocks, &debug_path.join("3_textblock.json"))?;
+            render_textblocks(&upscaled_img, &textblocks, debug_path)?;
         }
 
         let textblocks = self.run_pre_dict(textblocks, &config.translator)?;

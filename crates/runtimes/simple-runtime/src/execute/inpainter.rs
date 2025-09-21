@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use interface_image::{Mask, RawImage};
 use interface_inpainter::InpainterOptions;
+use log::info;
 
 use crate::{
     execute::ImageProcessor,
@@ -18,6 +19,7 @@ impl Models {
         config: &InpainterSettings,
         ip: &ImageProcessor,
     ) -> anyhow::Result<(RawImage, Mask)> {
+        info!("Run Inpainter: {:?}", config.inpainter);
         let mask_ = match config.mask {
             settings::Mask::Mask => original_mask,
             settings::Mask::RefinedMask => mask.clone(),

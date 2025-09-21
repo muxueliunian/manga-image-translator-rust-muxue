@@ -3,6 +3,7 @@ use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
 use interface_detector::textlines::Quadrilateral;
 use interface_image::RawImage;
 use interface_ocr::{OcrOptions, QuadrilateralInfo};
+use log::info;
 use parking_lot::Mutex;
 
 use crate::{execute::ImageProcessor, settings::OCRSettings, setup::Models};
@@ -23,6 +24,7 @@ impl Models {
         } else {
             None
         };
+        info!("Run OCR: {:?}", config.ocr);
         let textlines = self
             .get_ocr(config.ocr)
             .detect(img, areas, OcrOptions { debug_path }, ip)
