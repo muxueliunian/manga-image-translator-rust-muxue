@@ -48,7 +48,7 @@ impl Models {
         }
 
         let areas = areas.into_iter().map(to_mutex).collect::<Vec<_>>();
-        let upscaled_img = Arc::new(img);
+        let upscaled_img = img;
 
         let textlines = self
             .run_ocr(&upscaled_img, &areas, &config.ocr, &debug_path, &ip)
@@ -108,6 +108,8 @@ impl Models {
         if let Some(debug_path) = &debug_path {
             save_mask(&mask_refined, &debug_path.join("4_mask_refined.png"))?;
         }
+
+        let upscaled_img = Arc::new(upscaled_img);
 
         let (inpainted, mask) =
             self.run_inpainter(&upscaled_img, mask, mask_refined, &config.inpainter, &ip)?;

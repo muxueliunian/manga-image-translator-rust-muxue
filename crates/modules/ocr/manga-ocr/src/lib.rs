@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, path::PathBuf, sync::Arc};
 
 use base_util::onnx::{new_session, Providers};
-use image::{DynamicImage, GenericImageView, RgbImage};
+use image::GenericImageView;
 use interface_detector::textlines::Quadrilateral;
 use interface_image::{ImageOp, Mask};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
@@ -15,6 +15,7 @@ use ort::{
 };
 use parking_lot::Mutex;
 use tokio::task::spawn_blocking;
+use util::spawn_blocking;
 
 pub struct MangaOCRModels {
     enc: Session,
@@ -162,34 +163,22 @@ impl MangaOCR {
 impl interface_ocr::Ocr for MangaOCR {
     async fn detect(
         &mut self,
-        image: &Arc<interface_image::RawImage>,
+        image: &interface_image::RawImage,
         areas: &[Arc<Mutex<Quadrilateral>>],
         options: OcrOptions,
         img_processor: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<Vec<interface_ocr::QuadrilateralInfo>> {
         let mut texts = vec![];
-        // allow:clone[arc]
-        let image = image.clone();
-        let grayscale = spawn_blocking(move || {
-            Arc::new(
-                DynamicImage::from(
-                    RgbImage::from_raw(image.width as u32, image.height as u32, image.data.clone())
-                        .unwrap(),
-                )
-                .to_luma8(),
-            )
-        })
-        .await?;
+        let grayscale =
+            spawn_blocking!(|| Ok::<_, anyhow::Error>(image.clone().to_image()?.to_luma8()))??;
+
         for (i, area) in areas.iter().enumerate() {
             let bbox = area.lock().aabb();
-            // allow:clone[arc]
-            let grayscale = grayscale.clone();
-            let img = tokio::task::spawn_blocking(move || {
+            let img = spawn_blocking!(|| {
                 let view =
                     grayscale.view(bbox.x as u32, bbox.y as u32, bbox.w as u32, bbox.h as u32);
                 Mask::from(view.to_image())
-            })
-            .await?;
+            })?;
             if let Some(v) = &options.debug_path {
                 img.clone()
                     .to_image()?
@@ -219,7 +208,10 @@ async fn preprocessor(
         let img = resized
             .as_nd()?
             .mapv(|pixel| pixel as f32 / 255.0 * 2.0 - 1.0);
-        Ok(stack(Axis(0), &[img.view(), img.view(), img.view()])?.insert_axis(Axis(0)))
+
+        Ok(base_util::ndarray_utils::to_contiguous2(
+            stack(Axis(0), &[img.view(), img.view(), img.view()])?.insert_axis(Axis(0)),
+        ))
     })
     .await
     .unwrap()

@@ -17,6 +17,7 @@ image.workspace = true
 async-trait.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 parking_lot.workspace = true
+util.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

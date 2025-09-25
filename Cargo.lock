@@ -687,6 +687,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-scoped"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4042078ea593edffc452eef14e99fdb2b120caa4ad9618bcdeabc4a023b98740"
+dependencies = [
+ "futures",
+ "pin-project",
+ "tokio",
+]
+
+[[package]]
 name = "async-signal"
 version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2589,6 +2600,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "futures"
+version = "0.3.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65bc07b1a8bc7c85c5f2e110c476c7389b4554ba72af57d8445ea63a576b0876"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "futures-executor",
+ "futures-io",
+ "futures-sink",
+ "futures-task",
+ "futures-util",
+]
+
+[[package]]
 name = "futures-channel"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2603,6 +2629,17 @@ name = "futures-core"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f29059c0c2090612e8d742178b0580d2dc940c837851ad723096f87af6663e"
+
+[[package]]
+name = "futures-executor"
+version = "0.3.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e28d1d997f585e54aebc3f97d39e72338912123a67330d723fdbb564d646c9f"
+dependencies = [
+ "futures-core",
+ "futures-task",
+ "futures-util",
+]
 
 [[package]]
 name = "futures-io"
@@ -2652,6 +2689,7 @@ version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fa08315bb612088cc391249efdc3bc77536f16c91f6cf495e6fbe85b20a4a81"
 dependencies = [
+ "futures-channel",
  "futures-core",
  "futures-io",
  "futures-macro",
@@ -4051,6 +4089,7 @@ dependencies = [
  "ort",
  "parking_lot",
  "tokio",
+ "util",
 ]
 
 [[package]]
@@ -4259,6 +4298,7 @@ dependencies = [
  "parking_lot",
  "tokio",
  "uni-ocr",
+ "util",
 ]
 
 [[package]]
@@ -6585,6 +6625,7 @@ dependencies = [
  "ab_glyph",
  "anime4k",
  "anyhow",
+ "async-scoped",
  "base-util 0.10.0",
  "clap 4.5.48",
  "config",
@@ -7082,6 +7123,7 @@ dependencies = [
  "parking_lot",
  "tokio",
  "uni-ocr",
+ "util",
 ]
 
 [[package]]
@@ -7717,6 +7759,7 @@ name = "util"
 version = "0.10.0"
 dependencies = [
  "anyhow",
+ "async-scoped",
  "base-util 0.10.0",
  "clipper2",
  "clipper2c-sys",

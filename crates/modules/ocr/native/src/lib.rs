@@ -1,13 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
-use image::{DynamicImage, GenericImageView as _, RgbImage};
+use image::GenericImageView as _;
 use interface_detector::textlines::Quadrilateral;
 use interface_image::{ImageOp, Mask, RawImage};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad};
 use interface_ocr::{Ocr, QuadrilateralInfo};
 use parking_lot::Mutex;
-use tokio::task::spawn_blocking;
 use uni_ocr::{Language, OcrEngine, OcrOptions, OcrProvider};
+use util::spawn_blocking;
 
 #[derive(Default)]
 pub struct NativeOCR {
@@ -57,35 +57,22 @@ impl Model for NativeOCR {
 impl Ocr for NativeOCR {
     async fn detect(
         &mut self,
-        image: &Arc<RawImage>,
+        image: &RawImage,
         areas: &[Arc<Mutex<Quadrilateral>>],
         options: interface_ocr::OcrOptions,
         img_processor: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<Vec<interface_ocr::QuadrilateralInfo>> {
         let mut texts = vec![];
-        // allow:clone[arc]
-        let image = image.clone();
-        let grayscale = spawn_blocking(move || {
-            Arc::new(
-                DynamicImage::from(
-                    RgbImage::from_raw(image.width as u32, image.height as u32, image.data.clone())
-                        .unwrap(),
-                )
-                .to_luma8(),
-            )
-        })
-        .await?;
+        let grayscale =
+            spawn_blocking!(|| Ok::<_, anyhow::Error>(image.clone().to_image()?.to_luma8()))??;
 
         for (i, area) in areas.into_iter().enumerate() {
             let bbox = area.lock().aabb();
-            // allow:clone[arc]
-            let grayscale = grayscale.clone();
-            let img = spawn_blocking(move || {
+            let img = spawn_blocking!(|| {
                 let view =
                     grayscale.view(bbox.x as u32, bbox.y as u32, bbox.w as u32, bbox.h as u32);
                 Mask::from(view.to_image())
-            })
-            .await?;
+            })?;
             if let Some(v) = &options.debug_path {
                 img.clone()
                     .to_image()?
@@ -107,9 +94,10 @@ impl NativeOCR {
         _: &Arc<dyn interface_image::ImageOp + Send + Sync>,
     ) -> anyhow::Result<interface_ocr::QuadrilateralInfo> {
         let model = self.load()?;
-        let image =
-            spawn_blocking(move || image::DynamicImage::from(sliced_image.to_image().unwrap()))
-                .await?;
+        let image = tokio::task::spawn_blocking(move || {
+            image::DynamicImage::from(sliced_image.to_image().unwrap())
+        })
+        .await?;
 
         let (result, _, prob) = model.recognize_image(&image).await?;
         Ok(QuadrilateralInfo {

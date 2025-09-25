@@ -8,7 +8,7 @@ use ndarray::{
 use ordered_float::OrderedFloat;
 use ort::{
     inputs,
-    session::{Session, SessionOutputs},
+    session::{RunOptions, Session, SessionOutputs},
     value::{Tensor, Value, ValueTypeMarker},
 };
 const DECODER_LAYER_COUNT: u8 = 5;
@@ -37,13 +37,14 @@ fn stack_input_mask(input_mask: ArrayView2<bool>, hypos: &[Hypothesis]) -> Array
     .expect("stack failed")
 }
 
-fn next_token_batch<'a, T: ValueTypeMarker>(
+async fn next_token_batch<'b, 'a: 'b, T: ValueTypeMarker>(
     hypos: &mut Vec<Hypothesis>,
-    memory: &Value,
-    memory_mask: &Value<T>,
+    memory: &'b Value,
+    memory_mask: &'b Value<T>,
     decoder: &'a mut Session,
     beams_k: i32,
-) -> SessionOutputs<'a> {
+    run_options: &'b RunOptions,
+) -> SessionOutputs<'b> {
     let n = hypos.len();
     let offset = Tensor::from_array(Array::from_elem((), hypos[0].len() as i64)).unwrap();
     let num_layers = DECODER_LAYER_COUNT as usize;
@@ -74,7 +75,7 @@ fn next_token_batch<'a, T: ValueTypeMarker>(
     let l = Tensor::from_array(Array::from_elem((), l_glob as i64)).unwrap();
     let beams_k = Tensor::from_array(Array::from_elem((), beams_k as i32)).unwrap();
     let activation_cache = Tensor::from_array(activation_cache).unwrap();
-    let out = decoder.run(inputs!{"memory" => memory, "memory_mask" => memory_mask, "last_toks"=>last_toks, "memory_idxs_tensor"=>memory_idxs_tensor, "activation_cache"=>activation_cache, "offset"=>offset, "L"=>l, "beams_k" => beams_k}).unwrap();
+    let out = decoder.run_async(inputs!{"memory" => memory, "memory_mask" => memory_mask, "last_toks"=>last_toks, "memory_idxs_tensor"=>memory_idxs_tensor, "activation_cache"=>activation_cache, "offset"=>offset, "L"=>l, "beams_k" => beams_k}, run_options).unwrap().await.unwrap();
     let activation_cache: ArrayViewD<f32> = out
         .get("out_activation_cache")
         .unwrap()
@@ -97,7 +98,8 @@ fn next_token_batch<'a, T: ValueTypeMarker>(
     out
 }
 
-pub fn infer(
+//TODO: convert to async
+pub async fn infer(
     encoder: &mut Session,
     decoder: &mut Session,
     color_pred: &mut Session,
@@ -108,19 +110,33 @@ pub fn infer(
     beams_k: i32,
     max_seq_length: i32,
     max_finished_hypos: usize,
+    run_options: &RunOptions,
 ) -> Vec<Pred> {
     let n = img.shape()[0];
     let img = Tensor::from_array(img).unwrap();
     let img_widths = Tensor::from_array(Array1::from(new_widths)).unwrap();
     let out = encoder
-        .run(inputs! {"img" => img, "img_widths" => img_widths})
+        .run_async(
+            inputs! {"img" => img, "img_widths" => img_widths},
+            run_options,
+        )
+        .unwrap()
+        .await
         .unwrap();
     let memory = out.get("memory").unwrap();
     let input_mask = out.get("input_mask").unwrap();
     let mut hypos = (0..n as i64)
         .map(|i| Hypothesis::new(DECODER_LAYER_COUNT, 320, i, start_tok, end_tok))
         .collect::<Vec<_>>();
-    let out = next_token_batch(&mut hypos, memory, input_mask, decoder, beams_k);
+    let out = next_token_batch(
+        &mut hypos,
+        memory,
+        input_mask,
+        decoder,
+        beams_k,
+        run_options,
+    )
+    .await;
     let pred_chars_values = out
         .get("out_pred_chars_values")
         .unwrap()
@@ -155,7 +171,7 @@ pub fn infer(
         let im = input_mask.try_extract_array().unwrap();
         let im = stack_input_mask(im.into_dimensionality().unwrap(), &hypos);
         let im = Tensor::from_array(im).unwrap();
-        let out = next_token_batch(&mut hypos, memory, &im, decoder, beams_k);
+        let out = next_token_batch(&mut hypos, memory, &im, decoder, beams_k, run_options).await;
         let pred_chars_values = out
             .get("out_pred_chars_values")
             .unwrap()
@@ -235,7 +251,11 @@ pub fn infer(
         mem::swap(&mut out_idx, &mut cur_hypo.out_idx);
         let prob = cur_hypo.prob();
         let decoded = Tensor::from_array(cur_hypo.output_owned()).unwrap();
-        let out = color_pred.run(inputs![decoded]).unwrap();
+        let out = color_pred
+            .run_async(inputs![decoded], run_options)
+            .unwrap()
+            .await
+            .unwrap();
 
         let fg_pred = out
             .get("fg_pred")

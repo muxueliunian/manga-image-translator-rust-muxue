@@ -14,7 +14,7 @@ pub struct OcrOptions {
 pub trait Ocr {
     async fn detect(
         &mut self,
-        image: &Arc<RawImage>,
+        image: &RawImage,
         areas: &[Arc<Mutex<Quadrilateral>>],
         options: OcrOptions,
         img_processor: &Arc<dyn ImageOp + Send + Sync>,

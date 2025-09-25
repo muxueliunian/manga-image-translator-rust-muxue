@@ -11,7 +11,7 @@ use crate::{execute::ImageProcessor, settings::OCRSettings, setup::Models};
 impl Models {
     pub async fn run_ocr(
         &mut self,
-        img: &Arc<RawImage>,
+        img: &RawImage,
         areas: &[Arc<Mutex<Quadrilateral>>],
         config: &OCRSettings,
         debug_path: &Option<PathBuf>,

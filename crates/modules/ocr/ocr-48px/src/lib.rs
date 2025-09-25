@@ -1,7 +1,7 @@
 mod hypo;
 mod infer;
 
-use std::{fs::read_to_string, ops::Deref, sync::Arc};
+use std::{collections::HashMap, fs::read_to_string, path::PathBuf, sync::Arc};
 
 use base_util::{
     onnx::{new_session, Providers},
@@ -13,11 +13,18 @@ use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use interface_ocr::{Ocr, OcrOptions, QuadrilateralInfo};
 use maplit::hashmap;
 use ndarray::{s, Array4, Axis};
-use opencv::core::{MatTraitConst as _, MatTraitConstManual};
-use ort::session::Session;
-use util::{
-    average::AvgMeter, resize::get_transformed_region, text_direction::generate_text_direction,
+use opencv::core::{Mat, MatTraitConst as _, MatTraitConstManual};
+use ort::{
+    session::{RunOptions, Session},
+    sys::OrtRunOptions,
 };
+use parking_lot::Mutex;
+use util::{
+    average::AvgMeter, ocr, resize::get_transformed_region, spawn_blocking,
+    text_direction::generate_text_direction,
+};
+
+use crate::infer::Pred;
 
 pub struct Ocr48px {
     model: Option<((Session, Session, Session), Vec<String>)>,
@@ -83,80 +90,110 @@ impl Model for Ocr48px {
     }
 }
 
+fn post_process(
+    texts: Vec<Pred>,
+    dict: &Vec<String>,
+    areas: &[Arc<parking_lot::Mutex<Quadrilateral>>],
+) -> Vec<QuadrilateralInfo> {
+    let mut out = Vec::with_capacity(texts.len());
+    for (i, pred) in texts.into_iter().enumerate() {
+        let mut cur_texts = String::new();
+        let mut avgs = [AvgMeter::default(); 6];
+        let pred_chars_index = pred.out_idx;
+        let fg_pred = pred.fg_pred;
+        assert_eq!(fg_pred.len(), pred_chars_index.len());
+        let has_fg = pred
+            .fg_ind_pred
+            .iter()
+            .map(|v| (v.1 > v.0) as u32)
+            .sum::<u32>() as f64
+            / pred.fg_ind_pred.len() as f64
+            > 0.5;
+        let has_bg = pred
+            .bg_ind_pred
+            .iter()
+            .map(|v| (v.1 > v.0) as u32)
+            .sum::<u32>() as f64
+            / pred.bg_ind_pred.len() as f64
+            > 0.5;
+        for (chid, fg_pred, bg_pred) in pred_chars_index
+            .into_iter()
+            .zip(fg_pred)
+            .zip(pred.bg_pred)
+            .map(|((x, y), z)| (x, y, z))
+        {
+            let mut ch = dict[chid as usize].as_str();
+            if ch == "<S>" {
+                continue;
+            } else if ch == "</S>" {
+                break;
+            } else if ch == "<SP>" {
+                ch = " ";
+            } else {
+                avgs[0].update((fg_pred.0 * 255.0).clamp(0.0, 255.0) as i32);
+                avgs[1].update((fg_pred.1 * 255.0).clamp(0.0, 255.0) as i32);
+                avgs[2].update((fg_pred.2 * 255.0).clamp(0.0, 255.0) as i32);
+                avgs[3].update((bg_pred.0 * 255.0).clamp(0.0, 255.0) as i32);
+                avgs[4].update((bg_pred.1 * 255.0).clamp(0.0, 255.0) as i32);
+                avgs[5].update((bg_pred.2 * 255.0).clamp(0.0, 255.0) as i32);
+            }
+            cur_texts.push_str(ch);
+        }
+
+        out.push(QuadrilateralInfo {
+            text: cur_texts,
+            fg: match has_fg {
+                true => Some([
+                    avgs[0].average() as u8,
+                    avgs[1].average() as u8,
+                    avgs[2].average() as u8,
+                ]),
+                false => None,
+            },
+            bg: match has_bg {
+                true => Some([
+                    avgs[3].average() as u8,
+                    avgs[4].average() as u8,
+                    avgs[5].average() as u8,
+                ]),
+                false => None,
+            },
+            // allow:clone[arc]
+            pos: areas[i].clone(),
+            prob: pred.prob as f64,
+        });
+    }
+
+    out
+}
+
 #[async_trait::async_trait]
 impl Ocr for Ocr48px {
     async fn detect(
         &mut self,
-        image: &Arc<RawImage>,
+        image: &RawImage,
         areas: &[Arc<parking_lot::Mutex<Quadrilateral>>],
         options: OcrOptions,
         _: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<Vec<QuadrilateralInfo>> {
         let mut out = vec![];
         let text_height = 48;
-        let whs = areas
-            .iter()
-            .map(|v| {
-                let aabb = v.lock().aabb();
-                let w = aabb.w;
-                let h = aabb.h;
-                let scale = text_height as f64 / w as f64;
-                (h as f64 * scale) as u32
-            })
-            .collect::<Vec<_>>();
-        let mut perm: Vec<usize> = (0..whs.len()).collect();
-        let quadrilaterals = generate_text_direction(areas.to_vec()).collect::<Vec<_>>();
-        perm.sort_by_key(|&i| whs[i]);
-
-        let img = image.deref().clone().to_image().unwrap().to_rgb8();
-        //TODO: apply direction
-        let region_imgs = quadrilaterals
-            .iter()
-            .map(|(v, _)| {
-                Ok::<_, anyhow::Error>((get_transformed_region(&*v.lock(), &img, text_height)?, v))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let (region_imgs, areas): (Vec<_>, Vec<_>) = region_imgs.into_iter().unzip();
+        let items: Vec<(
+            ndarray::ArrayBase<ndarray::OwnedRepr<f32>, ndarray::Dim<[usize; 4]>>,
+            Vec<i32>,
+            Vec<Arc<parking_lot::lock_api::Mutex<parking_lot::RawMutex, Quadrilateral>>>,
+        )> = spawn_blocking!(|| ocr::prepare(
+            image,
+            areas,
+            text_height as u32,
+            self.max_batch_size,
+            &options.debug_path,
+        ))??;
         let max_seq_len = self.max_seq_len;
-        let max_batch_size = self.max_batch_size;
         let ((encoder, decoder, color_pred), dict) = self.load()?;
         let dict = &*dict;
-        for (ii, indices) in perm.chunks(max_batch_size).enumerate() {
-            let n = indices.len();
-            let img_slice = indices.iter().map(|v| &region_imgs[*v]).collect::<Vec<_>>();
-            let widths = img_slice.iter().map(|v| v.cols()).collect::<Vec<_>>();
-            let max_width = widths.iter().max().copied().unwrap_or_default() as usize + 7;
-            let text_height = text_height as usize;
-            let mut region = Array4::<u8>::zeros((n, text_height, max_width, 3));
-            for (i, tmp) in img_slice.iter().enumerate() {
-                let tmp = to_continous2(tmp);
-                let data = tmp.data_bytes().expect("to_continous used");
-                let rows = tmp.rows() as usize;
-                let cols = tmp.cols() as usize;
-                let row_stride = tmp.step1(0).unwrap();
-                for y in 0..rows.min(text_height) {
-                    let row_start = y * row_stride;
-                    let row_end = row_start + (cols.min(max_width) * 3); // 3 channels
-                    let row_slice = &data[row_start..row_end];
-                    region
-                        .slice_mut(s![i, y, 0..cols.min(max_width), ..])
-                        .assign(
-                            &ndarray::ArrayView::from_shape((cols.min(max_width), 3), row_slice)
-                                .unwrap(),
-                        );
-                }
-            }
-            if let Some(v) = &options.debug_path {
-                for (i, img) in region.axis_iter(Axis(0)).enumerate() {
-                    RawImageCow::from(img)
-                        .to_owned()
-                        .to_image()?
-                        .save(v.join(format!("patch_{ii}_{i}.png")))?
-                }
-            }
-            let images = region
-                .mapv(|v| (v as f32 - 127.5) / 127.5)
-                .permuted_axes([0, 3, 1, 2]);
+        let run_options = RunOptions::new()?;
+        for (images, widths, areas) in items {
             let texts = infer::infer(
                 encoder,
                 decoder,
@@ -168,74 +205,11 @@ impl Ocr for Ocr48px {
                 5,
                 max_seq_len,
                 2,
-            );
-            for (i, pred) in texts.into_iter().enumerate() {
-                let mut cur_texts = String::new();
-                let mut avgs = [AvgMeter::default(); 6];
-                let pred_chars_index = pred.out_idx;
-                let fg_pred = pred.fg_pred;
-                assert_eq!(fg_pred.len(), pred_chars_index.len());
-                let has_fg = pred
-                    .fg_ind_pred
-                    .iter()
-                    .map(|v| (v.1 > v.0) as u32)
-                    .sum::<u32>() as f64
-                    / pred.fg_ind_pred.len() as f64
-                    > 0.5;
-                let has_bg = pred
-                    .bg_ind_pred
-                    .iter()
-                    .map(|v| (v.1 > v.0) as u32)
-                    .sum::<u32>() as f64
-                    / pred.bg_ind_pred.len() as f64
-                    > 0.5;
-                for (chid, fg_pred, bg_pred) in pred_chars_index
-                    .into_iter()
-                    .zip(fg_pred)
-                    .zip(pred.bg_pred)
-                    .map(|((x, y), z)| (x, y, z))
-                {
-                    let mut ch = dict[chid as usize].as_str();
-                    if ch == "<S>" {
-                        continue;
-                    } else if ch == "</S>" {
-                        break;
-                    } else if ch == "<SP>" {
-                        ch = " ";
-                    } else {
-                        avgs[0].update((fg_pred.0 * 255.0).clamp(0.0, 255.0) as i32);
-                        avgs[1].update((fg_pred.1 * 255.0).clamp(0.0, 255.0) as i32);
-                        avgs[2].update((fg_pred.2 * 255.0).clamp(0.0, 255.0) as i32);
-                        avgs[3].update((bg_pred.0 * 255.0).clamp(0.0, 255.0) as i32);
-                        avgs[4].update((bg_pred.1 * 255.0).clamp(0.0, 255.0) as i32);
-                        avgs[5].update((bg_pred.2 * 255.0).clamp(0.0, 255.0) as i32);
-                    }
-                    cur_texts.push_str(ch);
-                }
-
-                out.push(QuadrilateralInfo {
-                    text: cur_texts,
-                    fg: match has_fg {
-                        true => Some([
-                            avgs[0].average() as u8,
-                            avgs[1].average() as u8,
-                            avgs[2].average() as u8,
-                        ]),
-                        false => None,
-                    },
-                    bg: match has_bg {
-                        true => Some([
-                            avgs[3].average() as u8,
-                            avgs[4].average() as u8,
-                            avgs[5].average() as u8,
-                        ]),
-                        false => None,
-                    },
-                    // allow:clone[arc]
-                    pos: areas[indices[i]].clone(),
-                    prob: pred.prob as f64,
-                });
-            }
+                &run_options,
+            )
+            .await;
+            let texts = spawn_blocking!(|| post_process(texts, dict, &areas))?;
+            out.extend(texts);
         }
         Ok(out)
     }
@@ -253,7 +227,7 @@ mod tests {
 
     use crate::Ocr48px;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn ocr_test() {
         let img = RawImage::new("./imgs/232265329-6a560438-e887-4f7f-b6a1-a61b8648f781.png")
             .expect("Failed to load image");

@@ -9,8 +9,8 @@ use cosmic_text::{
 use export::Export;
 use interface_image::{DimType, Mask, RawImage};
 use opencv::{
-    core::{Mat, MatTraitConst, Point, Size, BORDER_CONSTANT, BORDER_DEFAULT},
-    imgproc::{self, dilate, gaussian_blur, morphology_default_border_value},
+    core::{Mat, MatTraitConst, Point, Size, BORDER_CONSTANT},
+    imgproc::{self, dilate, morphology_default_border_value},
 };
 use ordered_float::OrderedFloat;
 

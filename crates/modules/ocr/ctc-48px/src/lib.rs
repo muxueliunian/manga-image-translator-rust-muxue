@@ -1,22 +1,15 @@
 mod decode;
 
-use std::{fs::read_to_string, ops::Deref, sync::Arc};
+use std::{fs::read_to_string, sync::Arc};
 
-use base_util::{
-    onnx::{new_session, Providers},
-    opencv_utils::to_continous2,
-};
+use base_util::onnx::{new_session, Providers};
 use interface_detector::textlines::Quadrilateral;
-use interface_image::{ImageOp, RawImage, RawImageCow};
+use interface_image::{ImageOp, RawImage};
 use interface_model::{impl_model_load_helpers, Model, ModelLoad, ModelSource};
 use interface_ocr::{Ocr, OcrOptions, QuadrilateralInfo};
 use maplit::hashmap;
-use ndarray::{s, Array4, Axis};
-use opencv::core::{MatTraitConst as _, MatTraitConstManual};
 use ort::session::Session;
-use util::{
-    average::AvgMeter, resize::get_transformed_region, text_direction::generate_text_direction,
-};
+use util::{average::AvgMeter, ocr};
 
 pub struct Ctc48pxOcr {
     model: Option<(Session, Vec<String>)>,
@@ -78,82 +71,26 @@ impl Model for Ctc48pxOcr {
 impl Ocr for Ctc48pxOcr {
     async fn detect(
         &mut self,
-        image: &Arc<RawImage>,
+        image: &RawImage,
         areas: &[Arc<parking_lot::Mutex<Quadrilateral>>],
         options: OcrOptions,
         _: &Arc<dyn ImageOp + Send + Sync>,
     ) -> anyhow::Result<Vec<QuadrilateralInfo>> {
+        let text_height = 48;
+
+        let items = ocr::prepare(
+            image,
+            areas,
+            text_height,
+            self.max_batch_size,
+            &options.debug_path,
+        )?;
         //TODO: ignore bubble
         let mut out = vec![];
-        let text_height = 48;
-        let whs = areas
-            .iter()
-            .map(|v| {
-                let aabb = v.lock().aabb();
-                let w = aabb.w;
-                let h = aabb.h;
-                let scale = text_height as f64 / w as f64;
-                (h as f64 * scale) as u32
-            })
-            .collect::<Vec<_>>();
-        let mut perm: Vec<usize> = (0..whs.len()).collect();
-        let quadrilaterals = generate_text_direction(areas.to_vec()).collect::<Vec<_>>();
-        perm.sort_by_key(|&i| whs[i]);
 
-        let img = image.deref().clone().to_image().unwrap().to_rgb8();
-        let region_imgs = quadrilaterals
-            .iter()
-            .map(|v| {
-                let vert = v.1;
-                v.0.lock().set_vert(vert);
-                v
-            })
-            .map(|(v, _)| {
-                Ok::<_, anyhow::Error>((get_transformed_region(&*v.lock(), &img, text_height)?, v))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let (region_imgs, areas): (Vec<_>, Vec<_>) = region_imgs.into_iter().unzip();
-        let max_batch_size = self.max_batch_size;
         let (model, dict) = self.load()?;
         let dict = &*dict;
-        for (ii, indices) in perm.chunks(max_batch_size).enumerate() {
-            let n = indices.len();
-            let img_slice = indices.iter().map(|v| &region_imgs[*v]).collect::<Vec<_>>();
-            let widths = img_slice.iter().map(|v| v.cols()).collect::<Vec<_>>();
-            let max_width = widths.iter().max().copied().unwrap_or_default() as usize + 135;
-            let text_height = text_height as usize;
-            let mut region = Array4::<u8>::zeros((n, text_height, max_width, 3));
-            for (i, tmp) in img_slice.iter().enumerate() {
-                let tmp = to_continous2(*tmp);
-                let data = tmp.data_bytes().expect("used to_continous");
-
-                let rows = tmp.rows() as usize;
-                let cols = tmp.cols() as usize;
-                let row_stride = tmp.step1(0).unwrap();
-                for y in 0..rows.min(text_height) {
-                    let row_start = y * row_stride;
-                    let row_end = row_start + (cols.min(max_width) * 3); // 3 channels
-                    let row_slice = &data[row_start..row_end];
-                    region
-                        .slice_mut(s![i, y, 0..cols.min(max_width), ..])
-                        .assign(
-                            &ndarray::ArrayView::from_shape((cols.min(max_width), 3), row_slice)
-                                .unwrap(),
-                        );
-                }
-            }
-            if let Some(v) = &options.debug_path {
-                for (i, img) in region.axis_iter(Axis(0)).enumerate() {
-                    RawImageCow::from(img)
-                        .to_owned()
-                        .to_image()?
-                        .save(v.join(format!("patch_{ii}_{i}.png")))?
-                }
-            }
-
-            let images = region
-                .mapv(|v| (v as f32 - 127.5) / 127.5)
-                .permuted_axes([0, 3, 1, 2]);
+        for (images, _, areas) in items {
             let texts = decode::decode(model, images, 0);
             for (i, single_line) in texts.into_iter().enumerate() {
                 if single_line.is_empty() {
@@ -192,7 +129,7 @@ impl Ocr for Ctc48pxOcr {
                         avgs[5].average() as u8,
                     ]),
                     // allow:clone[arc]
-                    pos: areas[indices[i]].clone(),
+                    pos: areas[i].clone(),
                     prob,
                 });
             }
