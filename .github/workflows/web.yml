@@ -25,7 +25,7 @@ jobs:
         run: mdbook build docs
 
       - name: Copy wheels folder
-        run: cp -r python/wheels docs/book/python/wheels
+        run: mkdir -p docs/book/python && cp -r python/wheels docs/book/python/wheels
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
