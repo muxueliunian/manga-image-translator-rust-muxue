@@ -4,3 +4,6 @@ language = "en"
 multilingual = false
 src = "src"
 title = "Manga Image Translator Docs"
+
+[output.html]
+site-url = "/manga-image-translator-rust"
