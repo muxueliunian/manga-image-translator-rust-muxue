@@ -1,4 +1,5 @@
 # Python Renderer Usage
+The runtime allows to export the processed image, before the text is rendered. This output can be used with the original Renderer from the python project. 
 
 After running the runtime you can run the Python renderer script.
 
