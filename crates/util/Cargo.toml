@@ -26,7 +26,6 @@ ort = { workspace = true, features = [
     "cuda",
     "coreml",
 ] }
-ndarray-linalg = { workspace = true, features = ["intel-mkl-static"] }
 rayon.workspace = true
 base-util = { workspace = true, features = ["onnx", "opencv"] }
 image.workspace = true

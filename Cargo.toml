@@ -49,7 +49,6 @@ flate2 = "1.1.2"
 tar = "0.4.44"
 sha2 = "0.10.9"
 ndarray-npy = "0.9.1"
-ndarray-linalg = { version = "0.17.0" }
 interface-model = { path = "crates/interface/model" }
 interface-inpainter = { path = "crates/interface/inpainter" }
 interface-image = { path = "crates/interface/image" }

@@ -9,7 +9,6 @@ ort = { workspace = true, optional = true, features = [
     "coreml",
     "tensorrt",
     "rocm",
-    "directml",
 ] }
 ndarray.workspace = true
 anyhow.workspace = true
