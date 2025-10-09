@@ -4,6 +4,3 @@
 [submodule "python/source"]
 	path = python/source
 	url = https://github.com/zyddnys/manga-image-translator
-[submodule "crates/modules/renderer/psd/PhotoshopAPI"]
-	path = crates/modules/renderer/psd/PhotoshopAPI
-	url = https://github.com/EmilDohne/PhotoshopAPI
