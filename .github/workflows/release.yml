@@ -37,6 +37,8 @@ jobs:
       - name: Checkout code
         if: matrix.platform.name != 'linux-x86_64'
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Checkout only .github files
         if: matrix.platform.name == 'linux-x86_64'
         uses: actions/checkout@v4
