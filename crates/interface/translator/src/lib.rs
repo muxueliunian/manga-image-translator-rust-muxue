@@ -19,9 +19,8 @@ impl JsonSchema for LanguageWrapper {
     fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
         {
             let mut map = serde_json::Map::new();
-            map.insert("type".into(), "string".into());
             map.insert(
-                "enum".into(),
+                "oneOf".into(),
                 serde_json::Value::Array({
                     let mut enum_values = Vec::new();
                     enum_values.push(to_enum_schema("cht", "Chinese Traditional"));

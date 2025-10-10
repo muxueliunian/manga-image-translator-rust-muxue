@@ -27,11 +27,7 @@
       "description": "Settings for the inpainter module",
       "$ref": "#/$defs/InpainterSettings",
       "default": {
-        "inpaint_color": [
-          255,
-          255,
-          255
-        ],
+        "inpaint_color": [255, 255, 255],
         "inpainter": "LamaAot",
         "inpainting_size": 2048,
         "mask": "RefinedMask"
@@ -121,11 +117,7 @@
     },
     "Detector": {
       "type": "string",
-      "enum": [
-        "DBNet",
-        "Paddle",
-        "Ctd"
-      ]
+      "enum": ["DBNet", "Paddle", "Ctd"]
     },
     "DetectorSettings": {
       "type": "object",
@@ -159,11 +151,7 @@
     },
     "Inpainter": {
       "type": "string",
-      "enum": [
-        "LamaAot",
-        "LamaLarge",
-        "LamaMpe"
-      ]
+      "enum": ["LamaAot", "LamaLarge", "LamaMpe"]
     },
     "InpainterSettings": {
       "type": "object",
@@ -171,11 +159,7 @@
         "inpaint_color": {
           "description": "If no ai is used for inpainting than use this color",
           "type": "array",
-          "default": [
-            255,
-            255,
-            255
-          ],
+          "default": [255, 255, 255],
           "items": {
             "type": "integer",
             "format": "uint8",
@@ -206,8 +190,7 @@
       }
     },
     "LanguageWrapper": {
-      "type": "string",
-      "enum": [
+      "oneOf": [
         {
           "description": "Chinese Traditional",
           "type": "string",
@@ -2372,20 +2355,11 @@
     },
     "Method": {
       "type": "string",
-      "enum": [
-        "FitText",
-        "FillMask"
-      ]
+      "enum": ["FitText", "FillMask"]
     },
     "OCR": {
       "type": "string",
-      "enum": [
-        "MangaOcr",
-        "Native",
-        "Tesseract",
-        "Ctc48px",
-        "Ocr48px"
-      ]
+      "enum": ["MangaOcr", "Native", "Tesseract", "Ctc48px", "Ocr48px"]
     },
     "OCRSettings": {
       "type": "object",
@@ -2459,10 +2433,7 @@
     },
     "Renderer": {
       "type": "string",
-      "enum": [
-        "Raw",
-        "Html"
-      ]
+      "enum": ["Raw", "Html"]
     },
     "SingleOrMultiple": {
       "anyOf": [
@@ -2500,10 +2471,7 @@
           "$ref": "#/$defs/Translator"
         }
       },
-      "required": [
-        "translator",
-        "target"
-      ]
+      "required": ["translator", "target"]
     },
     "Translator": {
       "type": "string",
@@ -2538,84 +2506,58 @@
           }
         },
         "pre_dict": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": ["string", "null"]
         },
         "target": {
           "$ref": "#/$defs/Target"
         }
       },
-      "required": [
-        "target",
-        "filter_lang"
-      ]
+      "required": ["target", "filter_lang"]
     },
     "Upscaler": {
       "oneOf": [
         {
           "type": "string",
-          "enum": [
-            "Esrgan2x",
-            "Esrgan4x",
-            "EsrganAnime4x",
-            "Anime4k"
-          ]
+          "enum": ["Esrgan2x", "Esrgan4x", "EsrganAnime4x", "Anime4k"]
         },
         {
           "type": "object",
           "properties": {
             "Waifu2xCuNetArt": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": ["integer", "null"],
               "format": "uint8",
               "maximum": 255,
               "minimum": 0
             }
           },
           "additionalProperties": false,
-          "required": [
-            "Waifu2xCuNetArt"
-          ]
+          "required": ["Waifu2xCuNetArt"]
         },
         {
           "type": "object",
           "properties": {
             "Waifu2xSwinUnetArt2x": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": ["integer", "null"],
               "format": "uint8",
               "maximum": 255,
               "minimum": 0
             }
           },
           "additionalProperties": false,
-          "required": [
-            "Waifu2xSwinUnetArt2x"
-          ]
+          "required": ["Waifu2xSwinUnetArt2x"]
         },
         {
           "type": "object",
           "properties": {
             "Waifu2xSwinUnetArt4x": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": ["integer", "null"],
               "format": "uint8",
               "maximum": 255,
               "minimum": 0
             }
           },
           "additionalProperties": false,
-          "required": [
-            "Waifu2xSwinUnetArt4x"
-          ]
+          "required": ["Waifu2xSwinUnetArt4x"]
         }
       ]
     },
@@ -2629,10 +2571,7 @@
           "minimum": 0
         },
         "patch_size": {
-          "type": [
-            "integer",
-            "null"
-          ],
+          "type": ["integer", "null"],
           "format": "uint",
           "default": null,
           "minimum": 0

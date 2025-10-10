@@ -1,4 +1,6 @@
 {
+  "$schema": "https://raw.githubusercontent.com/frederik-uni/manga-image-translator-rust/refs/heads/master/example/schema.json",
+
   "upscaler": { "upscaler": null, "patch_size": null, "padding": 0 },
   "detector": {
     "detector": "DBNet",
