@@ -6555,6 +6555,7 @@ dependencies = [
  "interface-ocr",
  "interface-translator",
  "numpy",
+ "ort",
  "paddle",
  "parking_lot",
  "pyo3",

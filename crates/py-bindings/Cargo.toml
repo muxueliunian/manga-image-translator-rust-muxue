@@ -19,6 +19,14 @@ interface-translator.workspace = true
 interface-ocr.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 anyhow.workspace = true
+ort.workspace = true
+
 [lib]
 name = "rusty_manga_image_translator"
 crate-type = ["cdylib"]
+
+[features]
+cuda = ["ort/cuda"]
+coreml = ["ort/coreml"]
+tensorrt = ["ort/tensorrt"]
+rocm = ["ort/rocm"]
