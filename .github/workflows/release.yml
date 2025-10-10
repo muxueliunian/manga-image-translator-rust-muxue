@@ -118,7 +118,7 @@ jobs:
       - name: Prepare Release Archives
         shell: bash
         run: |
-          for target in linux-x86_64 linux-arm64 windows-x86_64 macos-x86_64 macos-arm64; do
+          for target in linux-x86_64 linux-arm64 windows-x86_64 macos-arm64; do #macos-x86_64
             if [[ "$target" == "windows-x86_64" ]]; then
               zip -r "manga-image-translator-$target.zip" "$target"/*
             else
