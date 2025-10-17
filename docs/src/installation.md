@@ -10,3 +10,8 @@ Install [cudnn](https://developer.nvidia.com/cudnn-downloads)
 
 If you use cuda delete the `cudnn*` file in the downloaded folder.
 Otherwise, delete the `onnxruntime cuda execution provider`
+
+## Linux only
+- `cd path/to/folder`
+- `echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$(pwd)" >> ~/.bashrc`
+- `echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$(pwd)" >> ~/.zshrc`
