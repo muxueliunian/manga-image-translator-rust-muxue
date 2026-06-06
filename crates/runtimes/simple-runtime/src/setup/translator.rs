@@ -168,6 +168,7 @@ impl Translators {
                     interface_translator::NLLBSize::Large,
                 )) as TranslatorType),
                 Translator::Papago => create_papago().await,
+                Translator::OpenAICompatible => None,
                 Translator::Sugoi => Some(Box::new(interface_translator::SugoiTranslator::new(
                     cuda,
                     ComputeType::DEFAULT,

@@ -27,18 +27,21 @@ pub enum Translator {
     NLLBBase,
     NLLBLarge,
     Papago,
+    OpenAICompatible,
     #[default]
     Sugoi,
     Youdao,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(default)]
 pub struct TranslatorSettings {
     pub target: Target,
     /// Filters out languages that should not be translated
     pub filter_lang: Vec<LanguageWrapper>,
     pub pre_dict: Option<String>,
     pub post_dict: Option<String>,
+    pub openai_compatible: OpenAICompatibleSettings,
 }
 
 impl Default for TranslatorSettings {
@@ -51,6 +54,88 @@ impl Default for TranslatorSettings {
             filter_lang: vec![],
             pre_dict: None,
             post_dict: None,
+            openai_compatible: OpenAICompatibleSettings::default(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Copy, Clone, JsonSchema, Debug, PartialEq, Eq)]
+pub enum ProviderPreset {
+    #[default]
+    Custom,
+    OpenAI,
+    DeepSeek,
+    OpenRouter,
+    SiliconFlow,
+    DashScope,
+    Moonshot,
+    Zhipu,
+}
+
+impl ProviderPreset {
+    pub fn base_url(self) -> Option<&'static str> {
+        match self {
+            ProviderPreset::Custom => None,
+            ProviderPreset::OpenAI => Some("https://api.openai.com/v1"),
+            ProviderPreset::DeepSeek => Some("https://api.deepseek.com/v1"),
+            ProviderPreset::OpenRouter => Some("https://openrouter.ai/api/v1"),
+            ProviderPreset::SiliconFlow => Some("https://api.siliconflow.cn/v1"),
+            ProviderPreset::DashScope => Some("https://dashscope.aliyuncs.com/compatible-mode/v1"),
+            ProviderPreset::Moonshot => Some("https://api.moonshot.cn/v1"),
+            ProviderPreset::Zhipu => Some("https://open.bigmodel.cn/api/paas/v4"),
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            ProviderPreset::Custom => "Custom",
+            ProviderPreset::OpenAI => "OpenAI",
+            ProviderPreset::DeepSeek => "DeepSeek",
+            ProviderPreset::OpenRouter => "OpenRouter",
+            ProviderPreset::SiliconFlow => "SiliconFlow",
+            ProviderPreset::DashScope => "DashScope",
+            ProviderPreset::Moonshot => "Moonshot/Kimi",
+            ProviderPreset::Zhipu => "Zhipu GLM",
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, JsonSchema, Debug, PartialEq)]
+#[serde(default)]
+pub struct OpenAICompatibleSettings {
+    pub provider_preset: ProviderPreset,
+    pub base_url: String,
+    pub api_key: String,
+    pub model: String,
+    pub system_prompt: String,
+    pub user_prompt_template: String,
+    pub temperature: Option<f32>,
+    pub top_p: Option<f32>,
+    pub timeout_secs: u64,
+}
+
+impl OpenAICompatibleSettings {
+    pub fn resolved_base_url(&self) -> Option<&str> {
+        if self.base_url.trim().is_empty() {
+            self.provider_preset.base_url()
+        } else {
+            Some(self.base_url.trim())
+        }
+    }
+}
+
+impl Default for OpenAICompatibleSettings {
+    fn default() -> Self {
+        Self {
+            provider_preset: ProviderPreset::Custom,
+            base_url: String::new(),
+            api_key: String::new(),
+            model: String::new(),
+            system_prompt: "You are a professional manga translator. Translate faithfully and preserve meaning, tone, and line breaks where appropriate. Return only the numbered translations.".to_string(),
+            user_prompt_template: "Translate the following text from {source_language} to {target_language}.\nReturn exactly one translated line for each input line, preserving the numeric labels like [1]. Do not add explanations.\n\n{texts}".to_string(),
+            temperature: Some(0.2),
+            top_p: None,
+            timeout_secs: 60,
         }
     }
 }
@@ -132,4 +217,36 @@ impl SingleOrMultiple {
 pub struct Translation {
     pub translator: Translator,
     pub target: LanguageWrapper,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{OpenAICompatibleSettings, ProviderPreset};
+
+    #[test]
+    fn provider_preset_supplies_base_url_when_custom_url_empty() {
+        let settings = OpenAICompatibleSettings {
+            provider_preset: ProviderPreset::OpenAI,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            settings.resolved_base_url(),
+            Some("https://api.openai.com/v1")
+        );
+    }
+
+    #[test]
+    fn custom_base_url_overrides_provider_preset() {
+        let settings = OpenAICompatibleSettings {
+            provider_preset: ProviderPreset::OpenAI,
+            base_url: " https://example.test/v1 ".to_string(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            settings.resolved_base_url(),
+            Some("https://example.test/v1")
+        );
+    }
 }

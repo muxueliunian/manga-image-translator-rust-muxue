@@ -2,12 +2,14 @@ use std::{
     fs::{create_dir_all, File},
     io::Write,
     path::PathBuf,
+    sync::Arc,
 };
 
 use clap::Parser as _;
 use config::Config;
 use html::HtmlRenderer;
 use log::{error, info, warn};
+use tokio::sync::Mutex;
 use tracing_subscriber::EnvFilter;
 use walkdir::WalkDir;
 
@@ -152,12 +154,14 @@ async fn main() {
                 }
             }
         }
-        cli::Commands::Api { host, port } => api::main(&host, port).await.unwrap(),
+        cli::Commands::Api { host, port } => api::main(&host, port, Arc::new(Mutex::new(models)))
+            .await
+            .unwrap(),
         cli::Commands::Ui => {
             let native_options = eframe::NativeOptions {
                 viewport: egui::ViewportBuilder::default()
-                    .with_inner_size([400.0, 300.0])
-                    .with_min_inner_size([300.0, 220.0]),
+                    .with_inner_size([1100.0, 760.0])
+                    .with_min_inner_size([900.0, 620.0]),
                 // .with_icon(
                 //     // NOTE: Adding an icon is optional
                 //     eframe::icon_data::from_png_bytes(
@@ -170,7 +174,13 @@ async fn main() {
             eframe::run_native(
                 "Manga Image Translator",
                 native_options,
-                Box::new(|cc| Ok(Box::new(ui::MitApp::new(cc)))),
+                Box::new(|cc| {
+                    Ok(Box::new(ui::MitApp::new(
+                        cc,
+                        Arc::new(Mutex::new(models)),
+                        tokio::runtime::Handle::current(),
+                    )))
+                }),
             )
             .expect("Failed to run egui");
             return;
