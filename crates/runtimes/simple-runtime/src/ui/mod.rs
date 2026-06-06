@@ -16,11 +16,11 @@ use egui::{
     epaint::Shadow, Color32, FontData, FontDefinitions, FontFamily, RichText, Stroke, Style, Vec2,
     Visuals,
 };
-use html::HtmlRenderer;
 use serde::{Deserialize, Serialize};
 use tokio::{runtime::Handle, sync::Mutex};
 
 use crate::{
+    prepare_renderer_assets, render_export_bytes,
     settings::{OpenAICompatibleSettings, ProviderPreset, Renderer, Settings as RuntimeSettings},
     setup::Models,
 };
@@ -78,7 +78,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             target_language: TargetLanguage::ChineseSimplified,
-            renderer: UiRenderer::Html,
+            renderer: UiRenderer::Png,
             openai: OpenAiCompatibleConfig::default(),
         }
     }
@@ -150,15 +150,17 @@ impl TargetLanguage {
 
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UiRenderer {
+    Png,
     Html,
     Raw,
 }
 
 impl UiRenderer {
-    pub(super) const ALL: [UiRenderer; 2] = [UiRenderer::Html, UiRenderer::Raw];
+    pub(super) const ALL: [UiRenderer; 3] = [UiRenderer::Png, UiRenderer::Html, UiRenderer::Raw];
 
     pub(super) fn label(self) -> &'static str {
         match self {
+            UiRenderer::Png => "PNG 图片",
             UiRenderer::Html => "HTML",
             UiRenderer::Raw => "MIT 二进制",
         }
@@ -168,6 +170,7 @@ impl UiRenderer {
 impl From<UiRenderer> for Renderer {
     fn from(value: UiRenderer) -> Self {
         match value {
+            UiRenderer::Png => Renderer::Png,
             UiRenderer::Html => Renderer::Html,
             UiRenderer::Raw => Renderer::Raw,
         }
@@ -557,15 +560,9 @@ async fn process_one(
         create_dir_all(parent)?;
     }
 
-    if settings.render.renderer == Renderer::Html {
-        let (data, _) = HtmlRenderer::render(vec![exp], None, false);
-        if let Some(parent) = output.parent() {
-            html::copy_files(parent)?;
-        }
-        File::create(&output)?.write_all(&data)?;
-    } else {
-        File::create(&output)?.write_all(&exp.export())?;
-    }
+    prepare_renderer_assets(&output, &settings.render.renderer)?;
+    let data = render_export_bytes(exp, &settings.render.renderer)?;
+    File::create(&output)?.write_all(&data)?;
     Ok(Some(output))
 }
 

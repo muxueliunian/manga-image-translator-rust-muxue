@@ -7,8 +7,11 @@ use std::{
 
 use clap::Parser as _;
 use config::Config;
+use export::Export;
 use html::HtmlRenderer;
+use image::{ExtendedColorType, ImageEncoder};
 use log::{error, info, warn};
+use png::{PngRenderConfig, PngRenderer};
 use tokio::sync::Mutex;
 use tracing_subscriber::EnvFilter;
 use walkdir::WalkDir;
@@ -29,6 +32,44 @@ pub mod settings;
 pub mod setup;
 mod ui;
 mod update;
+mod webview_ui;
+
+pub fn render_export_to_png_bytes(exp: Export) -> anyhow::Result<Vec<u8>> {
+    let mut renderer = PngRenderer::default();
+    let img = renderer.render(exp, PngRenderConfig::default());
+    let mut data = Vec::new();
+    let color = match img.channels {
+        4 => ExtendedColorType::Rgba8,
+        3 => ExtendedColorType::Rgb8,
+        1 => ExtendedColorType::L8,
+        ch => anyhow::bail!("Unsupported PNG channel count: {ch}"),
+    };
+    image::codecs::png::PngEncoder::new(&mut data).write_image(
+        &img.data,
+        img.width as u32,
+        img.height as u32,
+        color,
+    )?;
+    Ok(data)
+}
+
+pub fn render_export_bytes(exp: Export, renderer: &Renderer) -> anyhow::Result<Vec<u8>> {
+    match renderer {
+        Renderer::Png => render_export_to_png_bytes(exp),
+        Renderer::Html => Ok(HtmlRenderer::render(vec![exp], None, false).0),
+        Renderer::Raw => Ok(exp.export()),
+    }
+}
+
+pub fn prepare_renderer_assets(path: &std::path::Path, renderer: &Renderer) -> anyhow::Result<()> {
+    if let Some(parent) = path.parent() {
+        create_dir_all(parent)?;
+        if renderer == &Renderer::Html {
+            html::copy_files(parent)?;
+        }
+    }
+    Ok(())
+}
 
 #[tokio::main]
 async fn main() {
@@ -47,6 +88,12 @@ async fn main() {
         .with_target(true)
         .with_env_filter(filter)
         .init();
+
+    if matches!(cli.command, cli::Commands::UiWebview) {
+        webview_ui::run().expect("Failed to run WebView UI");
+        return;
+    }
+
     let cuda = check_cuda();
     if !cuda && cfg!(all(target_arch = "x86_64", not(target_os = "macos"))) {
         warn!("CUDA is not available")
@@ -138,20 +185,11 @@ async fn main() {
                     }
                 };
                 output.set_extension(out_ext);
-                if settings.render.renderer == Renderer::Html {
-                    let (data, _) = HtmlRenderer::render(vec![exp], None, false);
-                    if let Some(parent) = output.parent() {
-                        create_dir_all(parent).expect("Failed to create parent directory");
-                        html::copy_files(parent).expect("Failed to copy important js files");
-                    }
-                    File::create(output).unwrap().write_all(&data).unwrap();
-                } else {
-                    let bin = exp.export();
-                    if let Some(parent) = output.parent() {
-                        create_dir_all(parent).expect("Failed to create parent directory");
-                    }
-                    File::create(output).unwrap().write_all(&bin).unwrap();
-                }
+                prepare_renderer_assets(&output, &settings.render.renderer)
+                    .expect("Failed to prepare render output");
+                let data = render_export_bytes(exp, &settings.render.renderer)
+                    .expect("Failed to render output");
+                File::create(output).unwrap().write_all(&data).unwrap();
             }
         }
         cli::Commands::Api { host, port } => api::main(&host, port, Arc::new(Mutex::new(models)))
@@ -185,5 +223,6 @@ async fn main() {
             .expect("Failed to run egui");
             return;
         }
+        cli::Commands::UiWebview => unreachable!("ui-webview exits before model initialization"),
     }
 }

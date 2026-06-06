@@ -31,6 +31,24 @@ pub struct PngRenderConfig {
     pub line_height: f32,
     pub family: Option<String>,
 }
+impl Default for PngRenderConfig {
+    fn default() -> Self {
+        Self {
+            min_fontsize: 8.0,
+            max_fontsize: 96.0,
+            detect_offset: 8.0,
+            fg_color: None,
+            bg_color: None,
+            align: MyAlign::Center,
+            letter_spacing: None,
+            font_size: 24.0,
+            line_height: 1.2,
+            family: None,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 pub enum MyAlign {
     Left,
     Center,
@@ -40,48 +58,198 @@ pub enum MyAlign {
 impl PngRenderer {
     pub fn render(&mut self, exp: Export, config: PngRenderConfig) -> RawImage {
         let mut img = exp.get_image();
-        // for patch in exp.patches {
-        //     let patch_img = patch.get_image();
-        //     let (x, y) = patch.pos;
-        //     img.apply_patch(&patch_img, x as u16, y as u16);
-        //     let text = patch.info;
-        //     let obb = text.obb().unwrap();
-        //     let mut render_block = RenderTextBlock {
-        //         align: match config.align {
-        //             MyAlign::Left => Align::Left,
-        //             MyAlign::Center => Align::Center,
-        //             MyAlign::Right => Align::Right,
-        //         },
-        //         default_font_size: config.font_size,
-        //         default_line_height: config.line_height,
-        //         vertical: false,
-        //         size: (obb.w as usize, obb.h as usize),
-        //         texts: vec![Text {
-        //             text: text.text,
-        //             letter_spacing: config.letter_spacing,
-        //             color: config.fg_color.or(text.fg_color),
-        //             bg_color: config.bg_color.or(text.bg_color),
-        //             font_size: config.font_size,
-        //             line_height: config.line_height,
-        //             family: config.family.clone(),
-        //             weight: None,
-        //             style: Style::Normal,
-        //             stretch: None,
-        //         }],
-        //     };
+        normalize_color_image(&mut img);
+        let overlay = exp.get_overlay();
+        apply_inpaint_overlay(&mut img, &overlay);
 
-        //     let font_size = self
-        //         .max_fontsize((obb.w as usize, obb.h as usize), render_block.clone(), 1.0)
-        //         .clamp(
-        //             text.font_size as f32 - config.detect_offset,
-        //             text.font_size as f32 + config.detect_offset,
-        //         )
-        //         .clamp(config.min_fontsize, config.max_fontsize)
-        //         .round() as u32;
-        //     render_block.set_font_size(font_size as f32);
-        //     let img = self.render_block(render_block);
-        // }
+        for block in exp.blocks {
+            let Some(obb) = block.obb() else {
+                continue;
+            };
+            let text = block
+                .translations
+                .get("last_trans")
+                .and_then(|key| block.translations.get(key))
+                .or_else(|| block.translations.values().next())
+                .cloned()
+                .unwrap_or_else(|| block.text.clone());
+            if text.trim().is_empty() {
+                continue;
+            }
+
+            let size = (
+                obb.w.ceil().max(1.0) as usize,
+                obb.h.ceil().max(1.0) as usize,
+            );
+            let mut render_block = RenderTextBlock {
+                align: match config.align {
+                    MyAlign::Left => Align::Left,
+                    MyAlign::Center => Align::Center,
+                    MyAlign::Right => Align::Right,
+                },
+                default_font_size: config.font_size,
+                default_line_height: config.line_height,
+                vertical: false,
+                size,
+                texts: vec![Text {
+                    text,
+                    letter_spacing: config.letter_spacing,
+                    color: config.fg_color.or(block.fg_color).or(Some((0, 0, 0))),
+                    bg_color: config.bg_color.or(block.bg_color).or(Some((255, 255, 255))),
+                    font_size: config.font_size,
+                    line_height: config.line_height,
+                    family: config.family.clone(),
+                    weight: None,
+                    style: Style::Normal,
+                    stretch: None,
+                }],
+            };
+
+            let mut font_size = self.max_fontsize(size, render_block.clone(), 1.0);
+            if block.font_size > 0 {
+                let detected = block.font_size as f32;
+                font_size = font_size.clamp(
+                    (detected - config.detect_offset).max(1.0),
+                    detected + config.detect_offset,
+                );
+            }
+            font_size = font_size
+                .clamp(config.min_fontsize, config.max_fontsize)
+                .round()
+                .max(1.0);
+            render_block.set_font_size(font_size);
+
+            let text_img = self.render_block(render_block);
+            alpha_composite_rotated(&mut img, &text_img, obb.x, obb.y, obb.theta);
+        }
         img
+    }
+}
+
+fn normalize_color_image(img: &mut RawImage) {
+    match img.channels {
+        1 => {
+            let mut data = Vec::with_capacity(img.data.len() * 3);
+            for gray in &img.data {
+                data.extend([*gray, *gray, *gray]);
+            }
+            img.data = data;
+            img.channels = 3;
+        }
+        2 => {
+            let mut data = Vec::with_capacity(img.width as usize * img.height as usize * 4);
+            for px in img.data.chunks_exact(2) {
+                data.extend([px[0], px[0], px[0], px[1]]);
+            }
+            img.data = data;
+            img.channels = 4;
+        }
+        _ => {}
+    }
+}
+
+fn apply_inpaint_overlay(base: &mut RawImage, overlay: &RawImage) {
+    if base.width != overlay.width || base.height != overlay.height || base.channels < 3 {
+        return;
+    }
+    base.data
+        .chunks_mut(base.channels as usize)
+        .zip(overlay.data.chunks(overlay.channels as usize))
+        .for_each(|(base_px, overlay_px)| {
+            if overlay.channels >= 4 {
+                let alpha = overlay_px[3] as f32 / 255.0;
+                if alpha <= 0.0 {
+                    return;
+                }
+                for channel in 0..3 {
+                    base_px[channel] = ((overlay_px[channel] as f32 * alpha)
+                        + (base_px[channel] as f32 * (1.0 - alpha)))
+                        .round() as u8;
+                }
+            } else if overlay.channels >= 3 {
+                base_px[..3].copy_from_slice(&overlay_px[..3]);
+            }
+        });
+}
+
+fn alpha_composite_rotated(
+    base: &mut RawImage,
+    overlay: &RawImage,
+    center_x: f64,
+    center_y: f64,
+    theta: f64,
+) {
+    if overlay.width == 0 || overlay.height == 0 || overlay.channels < 4 || base.channels < 3 {
+        return;
+    }
+
+    let half_w = overlay.width as f64 / 2.0;
+    let half_h = overlay.height as f64 / 2.0;
+    let cos_t = theta.cos();
+    let sin_t = theta.sin();
+    let corners = [
+        (-half_w, -half_h),
+        (half_w, -half_h),
+        (half_w, half_h),
+        (-half_w, half_h),
+    ];
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for (dx, dy) in corners {
+        let x = center_x + dx * cos_t - dy * sin_t;
+        let y = center_y + dx * sin_t + dy * cos_t;
+        min_x = min_x.min(x);
+        min_y = min_y.min(y);
+        max_x = max_x.max(x);
+        max_y = max_y.max(y);
+    }
+
+    let start_x = min_x.floor().max(0.0) as i32;
+    let start_y = min_y.floor().max(0.0) as i32;
+    let end_x = max_x.ceil().min(base.width as f64 - 1.0) as i32;
+    let end_y = max_y.ceil().min(base.height as f64 - 1.0) as i32;
+    if start_x > end_x || start_y > end_y {
+        return;
+    }
+
+    for y in start_y..=end_y {
+        for x in start_x..=end_x {
+            let dx = x as f64 + 0.5 - center_x;
+            let dy = y as f64 + 0.5 - center_y;
+            let src_x = dx * cos_t + dy * sin_t + half_w;
+            let src_y = -dx * sin_t + dy * cos_t + half_h;
+            if src_x < 0.0
+                || src_y < 0.0
+                || src_x >= overlay.width as f64
+                || src_y >= overlay.height as f64
+            {
+                continue;
+            }
+            alpha_composite_pixel(
+                base,
+                x as usize,
+                y as usize,
+                overlay.rgba_pixel(src_x as DimType, src_y as DimType),
+            );
+        }
+    }
+}
+
+fn alpha_composite_pixel(base: &mut RawImage, x: usize, y: usize, rgba: [u8; 4]) {
+    if rgba[3] == 0 {
+        return;
+    }
+    let idx = (y * base.width as usize + x) * base.channels as usize;
+    let alpha = rgba[3] as f32 / 255.0;
+    for channel in 0..3 {
+        base.data[idx + channel] = ((rgba[channel] as f32 * alpha)
+            + (base.data[idx + channel] as f32 * (1.0 - alpha)))
+            .round() as u8;
+    }
+    if base.channels >= 4 {
+        base.data[idx + 3] = 255;
     }
 }
 
@@ -185,11 +353,7 @@ impl PngRenderer {
         let metrics = to_metrics(&text);
         let mut buffer_ = Buffer::new(&mut self.font_system, metrics);
         let mut buffer = buffer_.borrow_with(&mut self.font_system);
-        if text.vertical {
-            buffer.set_size(Some(text.size.0 as f32), None);
-        } else {
-            buffer.set_size(None, Some(text.size.1 as f32))
-        }
+        buffer.set_size(Some(text.size.0 as f32), Some(text.size.1 as f32));
         let attrs = Attrs::new();
         let spans = text
             .texts
@@ -212,7 +376,8 @@ impl PngRenderer {
         let mut color_map = ColorMap::default();
         let buffer = self.create_buffer(&text, &mut color_map);
         let layouts = buffer.layout_runs().collect::<Vec<_>>();
-        let (w, h) = wh(&layouts);
+        let w = text.size.0.max(1);
+        let h = text.size.1.max(1);
 
         let mut rgb = vec![[0_u8; 4]; h as usize * w as usize];
         let mut bg = vec![0_u8; h as usize * w as usize];
@@ -233,6 +398,9 @@ impl PngRenderer {
                         }
                         let x = x as usize;
                         let y = y as usize;
+                        if x >= w || y >= h {
+                            return;
+                        }
                         rgb[y * w + x] = [color.r(), color.g(), color.b(), a];
                         if a >= 127 {
                             bg[y * w + x] = glyph.metadata as u8;
@@ -263,30 +431,13 @@ impl PngRenderer {
         std::mem::forget(rgb);
 
         let flat: Vec<u8> = unsafe { Vec::from_raw_parts(ptr, len, cap) };
-        let src = Mat::from_slice(&bg.data).unwrap();
-        let src = src.reshape(4, h as i32).unwrap();
-        let mut dst = Mat::default();
-        let k = (font_size as f32 / 12.0).ceil() as i32;
-
-        // gaussian_blur(
-        //     &src,
-        //     &mut dst,
-        //     Size::new(2 * k + 1, 2 * k + 1),
-        //     0.0,
-        //     0.0,
-        //     BORDER_DEFAULT,
-        //     #[cfg(not(target_os = "linux"))]
-        //     opencv::core::AlgorithmHint::ALGO_HINT_DEFAULT,
-        // )
-        // .unwrap();
-
         let text = RawImage {
             width: w as DimType,
             height: h as DimType,
             data: flat,
             channels: 4,
         };
-        RawImage::try_from(dst).unwrap().apply(text)
+        bg.apply(text)
     }
 
     pub fn max_fontsize(

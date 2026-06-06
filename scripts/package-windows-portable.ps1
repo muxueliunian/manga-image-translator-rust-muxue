@@ -228,6 +228,10 @@ if ($Cuda) {
 
 Write-Step "Writing launchers"
 Write-Launcher -Path (Join-Path $PortableDir "run-ui.bat") -Lines @(
+    "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""Start-Process -FilePath '%CD%\$BinaryName' -ArgumentList 'ui-webview' -WorkingDirectory '%CD%' -WindowStyle Hidden"""
+)
+
+Write-Launcher -Path (Join-Path $PortableDir "run-egui.bat") -Lines @(
     """%CD%\$BinaryName"" ui %*",
     "pause"
 )
@@ -259,7 +263,8 @@ Contents:
 - config, models, uploads, and results directories
 
 Launchers:
-- run-ui.bat starts the desktop UI.
+- run-ui.bat starts the WebView desktop UI.
+- run-egui.bat starts the fallback egui desktop UI.
 - run-webui.bat starts the local web API/UI at http://127.0.0.1:8080/.
   You can pass a port as the first argument, for example: run-webui.bat 8766
 - run-cli-example.bat runs the CLI against the uploads folder and writes to results.

@@ -12,12 +12,11 @@ use actix_web::{
     web::{self, Data},
     App, HttpRequest, HttpResponse, HttpServer, Responder,
 };
-use html::HtmlRenderer;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::{settings, setup::Models};
+use crate::{prepare_renderer_assets, render_export_bytes, settings, setup::Models};
 
 const UPLOAD_DIR: &str = "./uploads";
 const RESULTS_DIR: &str = "./results";
@@ -152,7 +151,7 @@ async fn translate(
     };
 
     let id = Uuid::new_v4().to_string();
-    let file_name = format!("{id}.html");
+    let file_name = format!("{id}.{}", settings.render.renderer.extension());
     let result_path = PathBuf::from(RESULTS_DIR).join(&file_name);
 
     if let Err(err) = fs::create_dir_all(RESULTS_DIR) {
@@ -175,14 +174,17 @@ async fn translate(
         }
     };
 
-    let (data, _) = HtmlRenderer::render(vec![export], None, false);
-    if let Some(parent) = result_path.parent() {
-        if let Err(err) = html::copy_files(parent) {
-            return HttpResponse::InternalServerError()
-                .body(format!("Failed to copy HTML assets: {err}"));
-        }
+    if let Err(err) = prepare_renderer_assets(&result_path, &settings.render.renderer) {
+        return HttpResponse::InternalServerError()
+            .body(format!("Failed to prepare renderer assets: {err}"));
     }
 
+    let data = match render_export_bytes(export, &settings.render.renderer) {
+        Ok(data) => data,
+        Err(err) => {
+            return HttpResponse::InternalServerError().body(format!("Render failed: {err}"));
+        }
+    };
     if let Err(err) = fs::write(&result_path, data) {
         return HttpResponse::InternalServerError().body(format!("Failed to save result: {err}"));
     }
@@ -218,7 +220,10 @@ async fn results_list() -> impl Responder {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension() != Some(OsStr::new("html")) {
+        if !matches!(
+            path.extension().and_then(OsStr::to_str),
+            Some("png" | "html" | "bin")
+        ) {
             continue;
         }
 
