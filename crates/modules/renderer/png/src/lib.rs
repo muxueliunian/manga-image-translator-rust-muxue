@@ -545,7 +545,7 @@ mod tests {
     use cosmic_text::Style;
     use env_logger::Env;
 
-    use crate::{PngRenderer, RenderTextBlock, Text};
+    use crate::{apply_inpaint_overlay, PngRenderer, RenderTextBlock, Text};
 
     #[test]
     fn render_test() {
@@ -572,5 +572,26 @@ mod tests {
         };
         let img = renderer.render_block(block);
         img.to_image().unwrap().save("text.png").unwrap();
+    }
+
+    #[test]
+    fn apply_inpaint_overlay_blends_rgba_overlay() {
+        let mut base = interface_image::RawImage {
+            data: vec![255, 255, 255, 255, 255, 255],
+            width: 2,
+            height: 1,
+            channels: 3,
+        };
+        let overlay = interface_image::RawImage {
+            data: vec![10, 20, 30, 255, 200, 0, 0, 128],
+            width: 2,
+            height: 1,
+            channels: 4,
+        };
+
+        apply_inpaint_overlay(&mut base, &overlay);
+
+        assert_eq!(&base.data[..3], &[10, 20, 30]);
+        assert_eq!(&base.data[3..], &[227, 127, 127]);
     }
 }
