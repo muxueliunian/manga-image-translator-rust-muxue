@@ -95,12 +95,16 @@
       </section>
 
       <aside class="panel config-panel" aria-labelledby="configTitle">
-        <div class="panel-heading compact">
+        <div class="panel-heading compact config-heading">
           <div>
             <p class="section-kicker" data-i18n="configKicker">模型</p>
             <h2 id="configTitle" data-i18n="configTitle">翻译配置</h2>
           </div>
-          <button id="reloadDefaults" class="ghost-button" type="button" data-i18n="reloadDefaults">默认值</button>
+          <div class="config-actions">
+            <button id="reloadDefaults" class="ghost-button" type="button" data-i18n="reloadDefaults">默认值</button>
+            <button id="loadConfig" class="ghost-button" type="button" data-i18n="loadConfig">加载配置</button>
+            <button id="saveConfig" class="ghost-button" type="button" data-i18n="saveConfig">保存配置</button>
+          </div>
         </div>
 
         <div class="form-grid single">
@@ -132,12 +136,46 @@
               <option value="DeepSeek">DeepSeek</option>
               <option value="OpenRouter">OpenRouter</option>
               <option value="SiliconFlow">SiliconFlow</option>
+              <option value="DashScope">DashScope</option>
+              <option value="Moonshot">Moonshot/Kimi</option>
+              <option value="Zhipu">Zhipu GLM</option>
             </select>
+          </label>
+
+          <label class="field">
+            <span data-i18n="baseUrl">Base URL</span>
+            <input id="baseUrl" type="url" placeholder="https://api.deepseek.com/v1">
+          </label>
+
+          <label class="field">
+            <span data-i18n="apiKey">API Key</span>
+            <input id="apiKey" type="password" autocomplete="off" placeholder="sk-...">
           </label>
 
           <label class="field">
             <span data-i18n="modelName">模型名称</span>
             <input id="modelName" type="text" placeholder="deepseek-chat / gpt-4.1-mini">
+          </label>
+
+          <div class="form-grid compact">
+            <label class="field">
+              <span data-i18n="temperature">Temperature</span>
+              <input id="temperature" type="number" min="0" max="2" step="0.05">
+            </label>
+            <label class="field">
+              <span data-i18n="topP">Top P</span>
+              <input id="topP" type="number" min="0" max="1" step="0.05">
+            </label>
+          </div>
+
+          <label class="field">
+            <span data-i18n="systemPrompt">System Prompt</span>
+            <textarea id="systemPrompt" class="prompt-area" spellcheck="false"></textarea>
+          </label>
+
+          <label class="field">
+            <span data-i18n="userPrompt">User Prompt Template</span>
+            <textarea id="userPrompt" class="prompt-area" spellcheck="false"></textarea>
           </label>
         </div>
 

@@ -1,5 +1,5 @@
 use std::{
-    fs::{create_dir_all, File},
+    fs::{create_dir_all, read_to_string, File},
     io::Write,
     path::{Path, PathBuf},
     sync::Arc,
@@ -14,8 +14,8 @@ use tao::{
     event_loop::{ControlFlow, EventLoopBuilder},
     window::WindowBuilder,
 };
-use wry::WebViewBuilder;
 use wry::http::{header::CONTENT_TYPE, Response};
+use wry::WebViewBuilder;
 
 use crate::{
     prepare_renderer_assets, render_export_bytes,
@@ -49,6 +49,8 @@ enum IpcKind {
     PickFolder,
     PickOutputDir,
     Defaults,
+    LoadConfig,
+    SaveConfig,
     StartTranslation,
 }
 
@@ -93,6 +95,11 @@ struct StartTranslationPayload {
     output_dir: Option<PathBuf>,
     settings: Settings,
     output_format: String,
+}
+
+#[derive(Deserialize)]
+struct SaveConfigPayload {
+    settings: Settings,
 }
 
 pub fn run() -> Result<()> {
@@ -221,6 +228,15 @@ fn handle_ipc_request(
             to_value(paths_payload(folder.into_iter().collect()))
         }
         IpcKind::Defaults => to_value(Settings::default()),
+        IpcKind::LoadConfig => to_value(load_saved_settings().unwrap_or_default()),
+        IpcKind::SaveConfig => {
+            let payload = serde_json::from_value::<SaveConfigPayload>(request.payload.clone())
+                .map_err(|err| anyhow!("Invalid config payload: {err}"))?;
+            save_settings(&payload.settings)?;
+            to_value(serde_json::json!({
+                "path": config_path().display().to_string(),
+            }))
+        }
         IpcKind::StartTranslation => {
             let payload =
                 serde_json::from_value::<StartTranslationPayload>(request.payload.clone())
@@ -230,6 +246,29 @@ fn handle_ipc_request(
             to_value(result)
         }
     }
+}
+
+fn config_path() -> PathBuf {
+    std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("config")
+        .join("app.json")
+}
+
+fn load_saved_settings() -> Result<Settings> {
+    let path = config_path();
+    let content = read_to_string(&path)?;
+    serde_json::from_str(&content).map_err(Into::into)
+}
+
+fn save_settings(settings: &Settings) -> Result<()> {
+    let path = config_path();
+    if let Some(parent) = path.parent() {
+        create_dir_all(parent)?;
+    }
+    let content = serde_json::to_string_pretty(settings)?;
+    File::create(path)?.write_all(content.as_bytes())?;
+    Ok(())
 }
 
 fn validate_translation_payload(payload: &StartTranslationPayload) -> Result<()> {

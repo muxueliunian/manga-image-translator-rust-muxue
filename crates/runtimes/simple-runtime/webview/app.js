@@ -19,10 +19,18 @@ const i18n = {
     configKicker: "模型",
     configTitle: "翻译配置",
     reloadDefaults: "默认值",
+    loadConfig: "加载配置",
+    saveConfig: "保存配置",
     translator: "翻译器",
     targetLang: "目标语言",
     provider: "模型供应商",
+    baseUrl: "Base URL",
+    apiKey: "API Key",
     modelName: "模型名称",
+    temperature: "Temperature",
+    topP: "Top P",
+    systemPrompt: "System Prompt",
+    userPrompt: "User Prompt Template",
     advancedJson: "高级 JSON 配置",
     readyTitle: "准备就绪",
     readyText: "选择输入与输出目录后即可开始。",
@@ -38,6 +46,8 @@ const i18n = {
     folderSelected: "已选择文件夹",
     outputSelected: "输出目录已设置",
     defaultsLoaded: "默认配置已加载",
+    configLoaded: "配置已加载",
+    configSaved: "配置已保存",
     starting: "已发送任务",
     backendPending: "正在执行翻译任务",
     jsonError: "JSON 配置格式错误",
@@ -62,10 +72,18 @@ const i18n = {
     configKicker: "Models",
     configTitle: "Translation Config",
     reloadDefaults: "Defaults",
+    loadConfig: "Load Config",
+    saveConfig: "Save Config",
     translator: "Translator",
     targetLang: "Target Language",
     provider: "Provider",
+    baseUrl: "Base URL",
+    apiKey: "API Key",
     modelName: "Model Name",
+    temperature: "Temperature",
+    topP: "Top P",
+    systemPrompt: "System Prompt",
+    userPrompt: "User Prompt Template",
     advancedJson: "Advanced JSON Config",
     readyTitle: "Ready",
     readyText: "Choose input and output directory to begin.",
@@ -81,10 +99,22 @@ const i18n = {
     folderSelected: "Folder selected",
     outputSelected: "Output directory set",
     defaultsLoaded: "Default settings loaded",
+    configLoaded: "Config loaded",
+    configSaved: "Config saved",
     starting: "Job sent",
     backendPending: "Translation is running",
     jsonError: "Invalid JSON settings",
   },
+};
+
+const providerBaseUrls = {
+  OpenAI: "https://api.openai.com/v1",
+  DeepSeek: "https://api.deepseek.com/v1",
+  OpenRouter: "https://openrouter.ai/api/v1",
+  SiliconFlow: "https://api.siliconflow.cn/v1",
+  DashScope: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  Moonshot: "https://api.moonshot.cn/v1",
+  Zhipu: "https://open.bigmodel.cn/api/paas/v4",
 };
 
 const state = {
@@ -108,9 +138,17 @@ const els = {
   translator: document.getElementById("translator"),
   targetLang: document.getElementById("targetLang"),
   provider: document.getElementById("provider"),
+  baseUrl: document.getElementById("baseUrl"),
+  apiKey: document.getElementById("apiKey"),
   modelName: document.getElementById("modelName"),
+  temperature: document.getElementById("temperature"),
+  topP: document.getElementById("topP"),
+  systemPrompt: document.getElementById("systemPrompt"),
+  userPrompt: document.getElementById("userPrompt"),
   settingsJson: document.getElementById("settingsJson"),
   reloadDefaults: document.getElementById("reloadDefaults"),
+  loadConfig: document.getElementById("loadConfig"),
+  saveConfig: document.getElementById("saveConfig"),
   startTranslation: document.getElementById("startTranslation"),
   statusTitle: document.getElementById("statusTitle"),
   statusText: document.getElementById("statusText"),
@@ -254,22 +292,56 @@ async function chooseOutputDir() {
 async function loadDefaults() {
   try {
     const defaults = await invoke("defaults");
-    state.settings = defaults;
-    els.settingsJson.value = JSON.stringify(defaults, null, 2);
-    syncControlsFromSettings();
+    applySettings(defaults);
     addLog("success", t("defaultsLoaded"));
   } catch (err) {
     addLog("error", err.message);
   }
 }
 
+async function loadConfig() {
+  try {
+    const config = await invoke("loadConfig");
+    applySettings(config);
+    addLog("success", t("configLoaded"));
+  } catch (err) {
+    addLog("error", err.message);
+  }
+}
+
+async function saveConfig() {
+  try {
+    const settings = patchSettingsFromControls();
+    const result = await invoke("saveConfig", { settings });
+    applySettings(settings);
+    addLog("success", `${t("configSaved")}: ${result.path || "config/app.json"}`);
+    setStatus(t("configSaved"), result.path || "config/app.json");
+  } catch (err) {
+    setStatus(t("jsonError"), err.message);
+    addLog("error", err.message);
+  }
+}
+
+function applySettings(settings) {
+  state.settings = settings || {};
+  els.settingsJson.value = JSON.stringify(state.settings, null, 2);
+  syncControlsFromSettings();
+}
+
 function syncControlsFromSettings() {
   const cfg = state.settings || {};
   const translation = cfg.translator?.target?.translator ? cfg.translator.target : null;
+  const openai = cfg.translator?.openai_compatible || {};
   els.translator.value = translation?.translator || "Sugoi";
   els.targetLang.value = translation?.target || "en";
-  els.provider.value = cfg.translator?.openai_compatible?.provider_preset || "Custom";
-  els.modelName.value = cfg.translator?.openai_compatible?.model || "";
+  els.provider.value = openai.provider_preset || "Custom";
+  els.baseUrl.value = openai.base_url || "";
+  els.apiKey.value = openai.api_key || "";
+  els.modelName.value = openai.model || "";
+  els.temperature.value = openai.temperature ?? "";
+  els.topP.value = openai.top_p ?? "";
+  els.systemPrompt.value = openai.system_prompt || "";
+  els.userPrompt.value = openai.user_prompt_template || "";
 }
 
 function patchSettingsFromControls() {
@@ -280,10 +352,31 @@ function patchSettingsFromControls() {
   cfg.translator.target.target = els.targetLang.value;
   cfg.translator.openai_compatible = cfg.translator.openai_compatible || {};
   cfg.translator.openai_compatible.provider_preset = els.provider.value;
+  cfg.translator.openai_compatible.base_url = els.baseUrl.value.trim();
+  cfg.translator.openai_compatible.api_key = els.apiKey.value.trim();
   cfg.translator.openai_compatible.model = els.modelName.value.trim();
+  cfg.translator.openai_compatible.system_prompt = els.systemPrompt.value;
+  cfg.translator.openai_compatible.user_prompt_template = els.userPrompt.value;
+  cfg.translator.openai_compatible.temperature = parseOptionalNumber(els.temperature.value);
+  cfg.translator.openai_compatible.top_p = parseOptionalNumber(els.topP.value);
   els.settingsJson.value = JSON.stringify(cfg, null, 2);
   state.settings = cfg;
   return cfg;
+}
+
+function parseOptionalNumber(value) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function applyProviderPreset() {
+  const baseUrl = providerBaseUrls[els.provider.value];
+  if (baseUrl) {
+    els.baseUrl.value = baseUrl;
+  }
+  patchSettingsFromControls();
 }
 
 async function startTranslation() {
@@ -351,6 +444,39 @@ async function bootstrap() {
   els.pickFolder.addEventListener("click", chooseFolder);
   els.pickOutputDir.addEventListener("click", chooseOutputDir);
   els.reloadDefaults.addEventListener("click", loadDefaults);
+  els.loadConfig.addEventListener("click", loadConfig);
+  els.saveConfig.addEventListener("click", saveConfig);
+  document.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      saveConfig();
+    }
+  });
+  els.provider.addEventListener("change", applyProviderPreset);
+  [
+    els.translator,
+    els.targetLang,
+    els.baseUrl,
+    els.apiKey,
+    els.modelName,
+    els.temperature,
+    els.topP,
+    els.systemPrompt,
+    els.userPrompt,
+  ].forEach((node) => {
+    node.addEventListener("input", () => {
+      try {
+        patchSettingsFromControls();
+      } catch (_) {
+      }
+    });
+    node.addEventListener("change", () => {
+      try {
+        patchSettingsFromControls();
+      } catch (_) {
+      }
+    });
+  });
   els.startTranslation.addEventListener("click", startTranslation);
   els.clearLog.addEventListener("click", () => {
     els.logList.innerHTML = "";
@@ -366,7 +492,7 @@ async function bootstrap() {
     addLog("error", err.message);
   }
 
-  await loadDefaults();
+  await loadConfig();
 }
 
 bootstrap();
