@@ -30,6 +30,7 @@ pub struct PngRenderConfig {
     pub font_size: f32,
     pub line_height: f32,
     pub family: Option<String>,
+    pub text_direction: TextDirectionMode,
 }
 impl Default for PngRenderConfig {
     fn default() -> Self {
@@ -44,8 +45,17 @@ impl Default for PngRenderConfig {
             font_size: 24.0,
             line_height: 1.2,
             family: None,
+            text_direction: TextDirectionMode::Auto,
         }
     }
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub enum TextDirectionMode {
+    #[default]
+    Auto,
+    Horizontal,
+    Vertical,
 }
 
 #[derive(Clone, Copy)]
@@ -77,9 +87,18 @@ impl PngRenderer {
                 continue;
             }
 
-            let size = (
-                obb.w.ceil().max(1.0) as usize,
-                obb.h.ceil().max(1.0) as usize,
+            let detected_vertical = obb.h > obb.w * 1.25;
+            let vertical = match config.text_direction {
+                TextDirectionMode::Auto => detected_vertical,
+                TextDirectionMode::Horizontal => false,
+                TextDirectionMode::Vertical => true,
+            };
+            let size = render_size_for_direction(
+                (
+                    obb.w.ceil().max(1.0) as usize,
+                    obb.h.ceil().max(1.0) as usize,
+                ),
+                vertical,
             );
             let mut render_block = RenderTextBlock {
                 align: match config.align {
@@ -89,7 +108,7 @@ impl PngRenderer {
                 },
                 default_font_size: config.font_size,
                 default_line_height: config.line_height,
-                vertical: false,
+                vertical,
                 size,
                 texts: vec![Text {
                     text,
@@ -121,9 +140,20 @@ impl PngRenderer {
             render_block.set_font_size(font_size);
 
             let text_img = self.render_block(render_block);
-            alpha_composite_rotated(&mut img, &text_img, obb.x, obb.y, obb.theta);
+            let theta = if vertical { obb.theta } else { 0.0 };
+            alpha_composite_rotated(&mut img, &text_img, obb.x, obb.y, theta);
         }
         img
+    }
+}
+
+fn render_size_for_direction(size: (usize, usize), vertical: bool) -> (usize, usize) {
+    if vertical {
+        size
+    } else {
+        let long = size.0.max(size.1);
+        let short = size.0.min(size.1);
+        (long.max(1), short.max(1))
     }
 }
 
@@ -351,6 +381,10 @@ fn wh(layouts: &Vec<LayoutRun<'_>>) -> (usize, usize) {
 }
 impl PngRenderer {
     fn create_buffer(&mut self, text: &RenderTextBlock, color_map: &mut ColorMap) -> Buffer {
+        if text.vertical {
+            return self.create_vertical_buffer(text, color_map);
+        }
+
         let metrics = to_metrics(&text);
         let mut buffer_ = Buffer::new(&mut self.font_system, metrics);
         let mut buffer = buffer_.borrow_with(&mut self.font_system);
@@ -366,6 +400,42 @@ impl PngRenderer {
             &attrs,
             Shaping::Advanced,
             Some(text.align),
+        );
+        buffer.shape_until_scroll(true);
+        buffer_
+    }
+
+    fn create_vertical_buffer(&mut self, text: &RenderTextBlock, color_map: &mut ColorMap) -> Buffer {
+        let mut vertical_text = text.clone();
+        vertical_text.texts.iter_mut().for_each(|span| {
+            span.text = span
+                .text
+                .chars()
+                .filter(|ch| *ch != '\r')
+                .flat_map(|ch| if ch == '\n' { vec![ch] } else { vec![ch, '\n'] })
+                .collect::<String>()
+                .trim_end()
+                .to_owned();
+        });
+
+        let metrics = to_metrics(&vertical_text);
+        let mut buffer_ = Buffer::new(&mut self.font_system, metrics);
+        let mut buffer = buffer_.borrow_with(&mut self.font_system);
+        buffer.set_size(
+            Some(vertical_text.size.0 as f32),
+            Some(vertical_text.size.1 as f32),
+        );
+        let attrs = Attrs::new();
+        let spans = vertical_text
+            .texts
+            .iter()
+            .map(|v| (v.text.as_str(), v.to_attr(color_map)))
+            .collect::<Vec<_>>();
+        buffer.set_rich_text(
+            spans.iter().map(|(text, attrs)| (*text, attrs.clone())),
+            &attrs,
+            Shaping::Advanced,
+            Some(vertical_text.align),
         );
         buffer.shape_until_scroll(true);
         buffer_

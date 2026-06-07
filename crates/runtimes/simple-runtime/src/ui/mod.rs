@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use tokio::{runtime::Handle, sync::Mutex};
 
 use crate::{
-    prepare_renderer_assets, render_export_bytes,
+    prepare_renderer_assets, render_export_bytes_with_settings,
     settings::{OpenAICompatibleSettings, ProviderPreset, Renderer, Settings as RuntimeSettings},
     setup::Models,
 };
@@ -561,7 +561,7 @@ async fn process_one(
     }
 
     prepare_renderer_assets(&output, &settings.render.renderer)?;
-    let data = render_export_bytes(exp, &settings.render.renderer)?;
+    let data = render_export_bytes_with_settings(exp, settings)?;
     File::create(&output)?.write_all(&data)?;
     Ok(Some(output))
 }

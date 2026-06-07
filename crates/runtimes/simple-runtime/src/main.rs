@@ -11,13 +11,13 @@ use export::Export;
 use html::HtmlRenderer;
 use image::{ExtendedColorType, ImageEncoder};
 use log::{error, info, warn};
-use png::{PngRenderConfig, PngRenderer};
+use png::{PngRenderConfig, PngRenderer, TextDirectionMode};
 use tokio::sync::Mutex;
 use tracing_subscriber::EnvFilter;
 use walkdir::WalkDir;
 
 use crate::{
-    settings::{Renderer, Settings},
+    settings::{Renderer, Settings, TextDirection},
     setup::Models,
     update::{check_crate_version, check_cuda},
 };
@@ -35,8 +35,25 @@ mod update;
 mod webview_ui;
 
 pub fn render_export_to_png_bytes(exp: Export) -> anyhow::Result<Vec<u8>> {
+    render_export_to_png_bytes_with_direction(exp, TextDirection::Auto)
+}
+
+pub fn render_export_to_png_bytes_with_direction(
+    exp: Export,
+    text_direction: TextDirection,
+) -> anyhow::Result<Vec<u8>> {
     let mut renderer = PngRenderer::default();
-    let img = renderer.render(exp, PngRenderConfig::default());
+    let img = renderer.render(
+        exp,
+        PngRenderConfig {
+            text_direction: match text_direction {
+                TextDirection::Auto => TextDirectionMode::Auto,
+                TextDirection::Horizontal => TextDirectionMode::Horizontal,
+                TextDirection::Vertical => TextDirectionMode::Vertical,
+            },
+            ..PngRenderConfig::default()
+        },
+    );
     let mut data = Vec::new();
     let color = match img.channels {
         4 => ExtendedColorType::Rgba8,
@@ -56,6 +73,19 @@ pub fn render_export_to_png_bytes(exp: Export) -> anyhow::Result<Vec<u8>> {
 pub fn render_export_bytes(exp: Export, renderer: &Renderer) -> anyhow::Result<Vec<u8>> {
     match renderer {
         Renderer::Png => render_export_to_png_bytes(exp),
+        Renderer::Html => Ok(HtmlRenderer::render(vec![exp], None, false).0),
+        Renderer::Raw => Ok(exp.export()),
+    }
+}
+
+pub fn render_export_bytes_with_settings(
+    exp: Export,
+    settings: &Settings,
+) -> anyhow::Result<Vec<u8>> {
+    match settings.render.renderer {
+        Renderer::Png => {
+            render_export_to_png_bytes_with_direction(exp, settings.render.text_direction)
+        }
         Renderer::Html => Ok(HtmlRenderer::render(vec![exp], None, false).0),
         Renderer::Raw => Ok(exp.export()),
     }
@@ -187,7 +217,7 @@ async fn main() {
                 output.set_extension(out_ext);
                 prepare_renderer_assets(&output, &settings.render.renderer)
                     .expect("Failed to prepare render output");
-                let data = render_export_bytes(exp, &settings.render.renderer)
+                let data = render_export_bytes_with_settings(exp, &settings)
                     .expect("Failed to render output");
                 File::create(output).unwrap().write_all(&data).unwrap();
             }

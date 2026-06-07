@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::{prepare_renderer_assets, render_export_bytes, settings, setup::Models};
+use crate::{prepare_renderer_assets, render_export_bytes_with_settings, settings, setup::Models};
 
 const UPLOAD_DIR: &str = "./uploads";
 const RESULTS_DIR: &str = "./results";
@@ -179,7 +179,7 @@ async fn translate(
             .body(format!("Failed to prepare renderer assets: {err}"));
     }
 
-    let data = match render_export_bytes(export, &settings.render.renderer) {
+    let data = match render_export_bytes_with_settings(export, &settings) {
         Ok(data) => data,
         Err(err) => {
             return HttpResponse::InternalServerError().body(format!("Render failed: {err}"));

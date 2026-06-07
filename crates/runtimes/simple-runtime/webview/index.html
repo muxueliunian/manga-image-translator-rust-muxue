@@ -91,6 +91,15 @@
               <option value="raw">Raw MIT</option>
             </select>
           </label>
+
+          <label class="field">
+            <span data-i18n="textDirection">文字方向</span>
+            <select id="textDirection">
+              <option value="auto" selected data-i18n="textDirectionAuto">自动</option>
+              <option value="horizontal" data-i18n="textDirectionHorizontal">横排</option>
+              <option value="vertical" data-i18n="textDirectionVertical">竖排</option>
+            </select>
+          </label>
         </div>
       </section>
 
@@ -190,6 +199,12 @@
       <div>
         <strong id="statusTitle" data-i18n="readyTitle">准备就绪</strong>
         <p id="statusText" data-i18n="readyText">选择输入与输出目录后即可开始。</p>
+        <div class="progress-wrap" aria-live="polite">
+          <div class="progress-track">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+          <span id="progressLabel" data-i18n="progressIdle">等待任务</span>
+        </div>
       </div>
       <button id="startTranslation" class="primary-button" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z" /></svg>

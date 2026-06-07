@@ -19,7 +19,7 @@ use wry::http::{header::CONTENT_TYPE, Response};
 use wry::WebViewBuilder;
 
 use crate::{
-    prepare_renderer_assets, render_export_bytes,
+    prepare_renderer_assets, render_export_bytes_with_settings,
     settings::{Renderer, Settings},
     setup::Models,
     update::check_cuda,
@@ -33,6 +33,7 @@ const APP_JS: &str = include_str!("../webview/app.js");
 enum UserEvent {
     Ipc(String),
     IpcResponse(IpcResponse<serde_json::Value>),
+    Progress(ProgressEvent),
 }
 
 #[derive(Debug, Deserialize)]
@@ -88,6 +89,14 @@ struct TranslationOutput {
     input: String,
     output: Option<String>,
     status: String,
+    message: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ProgressEvent {
+    current: usize,
+    total: usize,
+    percent: u8,
     message: String,
 }
 
@@ -148,6 +157,9 @@ pub fn run() -> Result<()> {
             }
             Event::UserEvent(UserEvent::IpcResponse(response)) => {
                 resolve_request(&webview, response);
+            }
+            Event::UserEvent(UserEvent::Progress(progress)) => {
+                send_event(&webview, "progress", progress);
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -259,7 +271,7 @@ fn handle_start_translation(
                     .map_err(|err| anyhow!("Invalid translation payload: {err}"))?;
             validate_translation_payload(&payload)?;
             let runtime = tokio::runtime::Runtime::new()?;
-            let result = runtime.block_on(run_translation_job(payload, models))?;
+            let result = runtime.block_on(run_translation_job(payload, models, proxy.clone()))?;
             to_value(result)
         })();
 
@@ -328,6 +340,7 @@ fn validate_translation_payload(payload: &StartTranslationPayload) -> Result<()>
 async fn run_translation_job(
     mut payload: StartTranslationPayload,
     models: Arc<std::sync::Mutex<Option<Models>>>,
+    proxy: tao::event_loop::EventLoopProxy<UserEvent>,
 ) -> Result<StartTranslationResult> {
     let renderer = renderer_from_web_value(&payload.output_format)?;
     payload.settings.render.renderer = renderer;
@@ -342,31 +355,54 @@ async fn run_translation_job(
     if inputs.is_empty() {
         return Err(anyhow!("No supported image files were found."));
     }
+    let total = inputs.len();
 
+    send_progress(&proxy, 0, total, "正在准备模型");
     ensure_models(&models).await?;
 
     let mut outputs = Vec::with_capacity(inputs.len());
-    for input in inputs {
+    for (index, input) in inputs.into_iter().enumerate() {
+        send_progress(
+            &proxy,
+            index,
+            total,
+            format!(
+                "正在处理 {}",
+                input
+                    .file_name()
+                    .and_then(|v| v.to_str())
+                    .unwrap_or("image")
+            ),
+        );
         let result = process_one(&input, &output_dir, &payload.settings, &models).await;
         match result {
-            Ok(Some(output)) => outputs.push(TranslationOutput {
-                input: input.display().to_string(),
-                output: Some(output.display().to_string()),
-                status: "done".to_owned(),
-                message: "完成".to_owned(),
-            }),
-            Ok(None) => outputs.push(TranslationOutput {
-                input: input.display().to_string(),
-                output: None,
-                status: "skipped".to_owned(),
-                message: "未检测到可翻译文本".to_owned(),
-            }),
-            Err(err) => outputs.push(TranslationOutput {
-                input: input.display().to_string(),
-                output: None,
-                status: "failed".to_owned(),
-                message: err.to_string(),
-            }),
+            Ok(Some(output)) => {
+                outputs.push(TranslationOutput {
+                    input: input.display().to_string(),
+                    output: Some(output.display().to_string()),
+                    status: "done".to_owned(),
+                    message: "完成".to_owned(),
+                });
+                send_progress(&proxy, index + 1, total, "已完成");
+            }
+            Ok(None) => {
+                outputs.push(TranslationOutput {
+                    input: input.display().to_string(),
+                    output: None,
+                    status: "skipped".to_owned(),
+                    message: "未检测到可翻译文本".to_owned(),
+                });
+                send_progress(&proxy, index + 1, total, "未检测到文本");
+            }
+            Err(err) => {
+                outputs.push(TranslationOutput {
+                    input: input.display().to_string(),
+                    output: None,
+                    status: "failed".to_owned(),
+                    message: err.to_string(),
+                });
+                send_progress(&proxy, index + 1, total, "处理失败");
+            }
         }
     }
 
@@ -380,6 +416,26 @@ async fn run_translation_job(
         message: format!("已完成 {done} 张，失败 {failed} 张。"),
         outputs,
     })
+}
+
+fn send_progress(
+    proxy: &tao::event_loop::EventLoopProxy<UserEvent>,
+    current: usize,
+    total: usize,
+    message: impl Into<String>,
+) {
+    let percent = if total == 0 {
+        0
+    } else {
+        ((current as f32 / total as f32) * 100.0).round() as u8
+    }
+    .min(100);
+    let _ = proxy.send_event(UserEvent::Progress(ProgressEvent {
+        current,
+        total,
+        percent,
+        message: message.into(),
+    }));
 }
 
 async fn ensure_models(models: &Arc<std::sync::Mutex<Option<Models>>>) -> Result<()> {
@@ -434,7 +490,7 @@ async fn process_one(
     );
     output.set_extension(settings.render.renderer.extension());
     prepare_renderer_assets(&output, &settings.render.renderer)?;
-    let data = render_export_bytes(exp, &settings.render.renderer)?;
+    let data = render_export_bytes_with_settings(exp, settings)?;
     File::create(&output)?.write_all(&data)?;
     Ok(Some(output))
 }

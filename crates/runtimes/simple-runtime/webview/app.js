@@ -16,6 +16,10 @@ const i18n = {
     dropHint: "支持多选图片或选择整本文件夹，翻译完成后会按所选格式写入输出目录。",
     outputDir: "输出目录",
     outputFormat: "输出格式",
+    textDirection: "文字方向",
+    textDirectionAuto: "自动",
+    textDirectionHorizontal: "横排",
+    textDirectionVertical: "竖排",
     configKicker: "模型",
     configTitle: "翻译配置",
     reloadDefaults: "默认值",
@@ -50,6 +54,10 @@ const i18n = {
     configSaved: "配置已保存",
     starting: "已发送任务",
     backendPending: "正在执行翻译任务",
+    progressIdle: "等待任务",
+    progressPreparing: "正在准备模型",
+    progressRunning: "正在处理",
+    progressDone: "处理完成",
     jsonError: "JSON 配置格式错误",
   },
   en: {
@@ -69,6 +77,10 @@ const i18n = {
     dropHint: "Select multiple images or an entire folder. Finished pages are written to the output directory.",
     outputDir: "Output Directory",
     outputFormat: "Output Format",
+    textDirection: "Text Direction",
+    textDirectionAuto: "Auto",
+    textDirectionHorizontal: "Horizontal",
+    textDirectionVertical: "Vertical",
     configKicker: "Models",
     configTitle: "Translation Config",
     reloadDefaults: "Defaults",
@@ -103,6 +115,10 @@ const i18n = {
     configSaved: "Config saved",
     starting: "Job sent",
     backendPending: "Translation is running",
+    progressIdle: "Idle",
+    progressPreparing: "Preparing models",
+    progressRunning: "Processing",
+    progressDone: "Done",
     jsonError: "Invalid JSON settings",
   },
 };
@@ -134,6 +150,7 @@ const els = {
   pickOutputDir: document.getElementById("pickOutputDir"),
   outputDir: document.getElementById("outputDir"),
   outputFormat: document.getElementById("outputFormat"),
+  textDirection: document.getElementById("textDirection"),
   inputList: document.getElementById("inputList"),
   translator: document.getElementById("translator"),
   targetLang: document.getElementById("targetLang"),
@@ -152,6 +169,8 @@ const els = {
   startTranslation: document.getElementById("startTranslation"),
   statusTitle: document.getElementById("statusTitle"),
   statusText: document.getElementById("statusText"),
+  progressBar: document.getElementById("progressBar"),
+  progressLabel: document.getElementById("progressLabel"),
   results: document.getElementById("results"),
   logList: document.getElementById("logList"),
   clearLog: document.getElementById("clearLog"),
@@ -171,6 +190,8 @@ window.MIT_BRIDGE = {
   emit(name, payload) {
     if (name === "log") {
       addLog(payload.level || "info", payload.message || "");
+    } else if (name === "progress") {
+      updateProgress(payload || {});
     }
   },
 };
@@ -219,6 +240,22 @@ function addLog(level, message) {
 function setStatus(title, text) {
   els.statusTitle.textContent = title;
   els.statusText.textContent = text;
+}
+
+function updateProgress(payload) {
+  const current = Number(payload.current ?? 0);
+  const total = Number(payload.total ?? 0);
+  const percent =
+    typeof payload.percent === "number"
+      ? payload.percent
+      : total > 0
+        ? Math.round((current / total) * 100)
+        : 0;
+  const clamped = Math.max(0, Math.min(100, percent));
+  els.progressBar.style.width = `${clamped}%`;
+  const message = payload.message || t("progressIdle");
+  els.progressLabel.textContent =
+    total > 0 ? `${message} · ${current}/${total} · ${clamped}%` : message;
 }
 
 function renderInputList() {
@@ -332,8 +369,12 @@ function syncControlsFromSettings() {
   const cfg = state.settings || {};
   const translation = cfg.translator?.target?.translator ? cfg.translator.target : null;
   const openai = cfg.translator?.openai_compatible || {};
+  const render = cfg.render || {};
   els.translator.value = translation?.translator || "Sugoi";
   els.targetLang.value = translation?.target || "en";
+  els.textDirection.value = render.text_direction
+    ? String(render.text_direction).toLowerCase()
+    : "auto";
   els.provider.value = openai.provider_preset || "Custom";
   els.baseUrl.value = openai.base_url || "";
   els.apiKey.value = openai.api_key || "";
@@ -366,9 +407,16 @@ function patchSettingsFromControls() {
   cfg.translator.openai_compatible.user_prompt_template = els.userPrompt.value;
   cfg.translator.openai_compatible.temperature = parseOptionalNumber(els.temperature.value);
   cfg.translator.openai_compatible.top_p = parseOptionalNumber(els.topP.value);
+  cfg.render = cfg.render || {};
+  cfg.render.text_direction = toPascalCase(els.textDirection.value || "auto");
   els.settingsJson.value = JSON.stringify(cfg, null, 2);
   state.settings = cfg;
   return cfg;
+}
+
+function toPascalCase(value) {
+  const normalized = String(value || "auto").toLowerCase();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 function parseOptionalNumber(value) {
@@ -401,6 +449,7 @@ async function startTranslation() {
 
   try {
     els.startTranslation.disabled = true;
+    updateProgress({ current: 0, total: state.inputPaths.length || 1, message: t("progressPreparing") });
     setStatus(t("starting"), t("backendPending"));
     const result = await invoke("startTranslation", {
       input_paths: state.inputPaths,
@@ -466,6 +515,7 @@ async function bootstrap() {
   [
     els.translator,
     els.targetLang,
+    els.textDirection,
     els.baseUrl,
     els.apiKey,
     els.modelName,
