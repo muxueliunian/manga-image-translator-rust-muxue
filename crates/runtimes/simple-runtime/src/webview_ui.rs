@@ -3,6 +3,7 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     sync::Arc,
+    thread,
 };
 
 use anyhow::{anyhow, Result};
@@ -31,6 +32,7 @@ const APP_JS: &str = include_str!("../webview/app.js");
 #[derive(Debug)]
 enum UserEvent {
     Ipc(String),
+    IpcResponse(IpcResponse<serde_json::Value>),
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,7 +107,7 @@ struct SaveConfigPayload {
 pub fn run() -> Result<()> {
     let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
-    let runtime = tokio::runtime::Runtime::new()?;
+    let ipc_proxy = proxy.clone();
     let models: Arc<std::sync::Mutex<Option<Models>>> = Arc::new(std::sync::Mutex::new(None));
     let window = WindowBuilder::new()
         .with_title("漫画图片翻译器")
@@ -123,7 +125,7 @@ pub fn run() -> Result<()> {
         })
         .with_url("mit://localhost/")
         .with_ipc_handler(move |request| {
-            let _ = proxy.send_event(UserEvent::Ipc(request.body().to_string()));
+            let _ = ipc_proxy.send_event(UserEvent::Ipc(request.body().to_string()));
         })
         .build(&window)?;
 
@@ -142,7 +144,10 @@ pub fn run() -> Result<()> {
                 );
             }
             Event::UserEvent(UserEvent::Ipc(message)) => {
-                handle_ipc_message(&webview, &runtime, models.clone(), &message);
+                handle_ipc_message(&webview, &proxy, models.clone(), &message);
+            }
+            Event::UserEvent(UserEvent::IpcResponse(response)) => {
+                resolve_request(&webview, response);
             }
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -163,7 +168,7 @@ fn build_html() -> String {
 
 fn handle_ipc_message(
     webview: &wry::WebView,
-    runtime: &tokio::runtime::Runtime,
+    proxy: &tao::event_loop::EventLoopProxy<UserEvent>,
     models: Arc<std::sync::Mutex<Option<Models>>>,
     message: &str,
 ) {
@@ -182,7 +187,12 @@ fn handle_ipc_message(
         }
     };
 
-    let response = match handle_ipc_request(&request, runtime, models) {
+    if matches!(request.kind, IpcKind::StartTranslation) {
+        handle_start_translation(request, proxy.clone(), models);
+        return;
+    }
+
+    let response = match handle_ipc_request(&request) {
         Ok(value) => IpcResponse {
             id: request.id,
             ok: true,
@@ -200,11 +210,7 @@ fn handle_ipc_message(
     resolve_request(webview, response);
 }
 
-fn handle_ipc_request(
-    request: &IpcRequest,
-    runtime: &tokio::runtime::Runtime,
-    models: Arc<std::sync::Mutex<Option<Models>>>,
-) -> Result<serde_json::Value> {
+fn handle_ipc_request(request: &IpcRequest) -> Result<serde_json::Value> {
     match request.kind {
         IpcKind::AppReady => to_value(AppReadyData {
             version: env!("CARGO_PKG_VERSION"),
@@ -237,15 +243,43 @@ fn handle_ipc_request(
                 "path": config_path().display().to_string(),
             }))
         }
-        IpcKind::StartTranslation => {
+        IpcKind::StartTranslation => unreachable!("handled asynchronously"),
+    }
+}
+
+fn handle_start_translation(
+    request: IpcRequest,
+    proxy: tao::event_loop::EventLoopProxy<UserEvent>,
+    models: Arc<std::sync::Mutex<Option<Models>>>,
+) {
+    thread::spawn(move || {
+        let result = (|| -> Result<serde_json::Value> {
             let payload =
                 serde_json::from_value::<StartTranslationPayload>(request.payload.clone())
                     .map_err(|err| anyhow!("Invalid translation payload: {err}"))?;
             validate_translation_payload(&payload)?;
+            let runtime = tokio::runtime::Runtime::new()?;
             let result = runtime.block_on(run_translation_job(payload, models))?;
             to_value(result)
-        }
-    }
+        })();
+
+        let response = match result {
+            Ok(value) => IpcResponse {
+                id: request.id,
+                ok: true,
+                data: Some(value),
+                error: None,
+            },
+            Err(err) => IpcResponse::<serde_json::Value> {
+                id: request.id,
+                ok: false,
+                data: None,
+                error: Some(err.to_string()),
+            },
+        };
+
+        let _ = proxy.send_event(UserEvent::IpcResponse(response));
+    });
 }
 
 fn config_path() -> PathBuf {

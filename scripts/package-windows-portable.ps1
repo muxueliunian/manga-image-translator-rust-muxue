@@ -190,9 +190,6 @@ if (-not (Test-Path -LiteralPath $BinaryPath -PathType Leaf)) {
 
 Write-Step "Preparing portable directory"
 New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
-if (Test-Path -LiteralPath $PortableDir) {
-    Remove-Item -LiteralPath $PortableDir -Recurse -Force
-}
 New-Item -ItemType Directory -Path $PortableDir -Force | Out-Null
 
 foreach ($dir in @("config", "models", "uploads", "results")) {

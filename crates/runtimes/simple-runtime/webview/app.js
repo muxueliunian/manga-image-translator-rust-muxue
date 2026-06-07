@@ -348,6 +348,13 @@ function patchSettingsFromControls() {
   const cfg = JSON.parse(els.settingsJson.value || "{}");
   cfg.translator = cfg.translator || {};
   cfg.translator.target = cfg.translator.target || {};
+  if (
+    els.provider.value !== "Custom" ||
+    els.baseUrl.value.trim() ||
+    els.apiKey.value.trim()
+  ) {
+    els.translator.value = "OpenAICompatible";
+  }
   cfg.translator.target.translator = els.translator.value;
   cfg.translator.target.target = els.targetLang.value;
   cfg.translator.openai_compatible = cfg.translator.openai_compatible || {};
@@ -375,6 +382,9 @@ function applyProviderPreset() {
   const baseUrl = providerBaseUrls[els.provider.value];
   if (baseUrl) {
     els.baseUrl.value = baseUrl;
+  }
+  if (els.provider.value !== "Custom") {
+    els.translator.value = "OpenAICompatible";
   }
   patchSettingsFromControls();
 }
