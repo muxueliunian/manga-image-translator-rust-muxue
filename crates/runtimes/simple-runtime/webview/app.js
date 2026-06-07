@@ -155,12 +155,18 @@ function invoke(kind, payload = {}) {
   const message = JSON.stringify({ id, kind, payload });
   return new Promise((resolve, reject) => {
     state.pending.set(id, { resolve, reject });
-    if (!window.ipc || typeof window.ipc.postMessage !== "function") {
+    const ipc =
+      window.ipc && typeof window.ipc.postMessage === "function"
+        ? window.ipc
+        : window.chrome?.webview && typeof window.chrome.webview.postMessage === "function"
+          ? window.chrome.webview
+          : null;
+    if (!ipc) {
       state.pending.delete(id);
       reject(new Error("WebView IPC bridge is not available."));
       return;
     }
-    window.ipc.postMessage(message);
+    ipc.postMessage(message);
   });
 }
 
@@ -206,6 +212,7 @@ function escapeHtml(value) {
 
 async function chooseImages() {
   try {
+    setStatus(t("starting"), "正在打开图片选择窗口...");
     const data = await invoke("pickImages");
     state.inputPaths = data.paths || [];
     renderInputList();
@@ -218,6 +225,7 @@ async function chooseImages() {
 
 async function chooseFolder() {
   try {
+    setStatus(t("starting"), "正在打开文件夹选择窗口...");
     const data = await invoke("pickFolder");
     state.inputPaths = data.paths || [];
     renderInputList();
@@ -230,6 +238,7 @@ async function chooseFolder() {
 
 async function chooseOutputDir() {
   try {
+    setStatus(t("starting"), "正在打开输出目录选择窗口...");
     const data = await invoke("pickOutputDir");
     state.outputDir = (data.paths || [])[0] || "";
     els.outputDir.value = state.outputDir;
@@ -352,6 +361,8 @@ async function bootstrap() {
     els.backendBadge.textContent = `${ready.backend} / ${ready.platform}`;
     addLog("success", `Backend bridge ready: ${ready.version}`);
   } catch (err) {
+    els.backendBadge.textContent = "IPC unavailable";
+    setStatus("IPC 未连接", err.message);
     addLog("error", err.message);
   }
 

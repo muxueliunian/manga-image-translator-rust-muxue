@@ -78,7 +78,7 @@ eframe = { version = "0.32", default-features = false, features = [
 ] }
 rfd = "0.15.4"
 tao = "0.35.3"
-wry = "0.55.1"
+wry = { version = "0.55.1", features = ["protocol"] }
 
 [profile.dev.package."*"]
 opt-level = 2

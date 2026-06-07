@@ -15,6 +15,7 @@ use tao::{
     window::WindowBuilder,
 };
 use wry::WebViewBuilder;
+use wry::http::{header::CONTENT_TYPE, Response};
 
 use crate::{
     prepare_renderer_assets, render_export_bytes,
@@ -105,9 +106,15 @@ pub fn run() -> Result<()> {
         .with_min_inner_size(LogicalSize::new(960.0, 640.0))
         .build(&event_loop)?;
 
-    let html = build_html();
     let webview = WebViewBuilder::new()
-        .with_html(html)
+        .with_custom_protocol("mit".into(), move |_webview_id, _request| {
+            Response::builder()
+                .header(CONTENT_TYPE, "text/html; charset=utf-8")
+                .body(build_html().into_bytes())
+                .unwrap()
+                .map(Into::into)
+        })
+        .with_url("mit://localhost/")
         .with_ipc_handler(move |request| {
             let _ = proxy.send_event(UserEvent::Ipc(request.body().to_string()));
         })

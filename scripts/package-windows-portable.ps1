@@ -231,6 +231,11 @@ Write-Launcher -Path (Join-Path $PortableDir "run-ui.bat") -Lines @(
     "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""Start-Process -FilePath '%CD%\$BinaryName' -ArgumentList 'ui-webview' -WorkingDirectory '%CD%' -WindowStyle Hidden"""
 )
 
+Write-Launcher -Path (Join-Path $PortableDir "run-ui-debug.bat") -Lines @(
+    """%CD%\$BinaryName"" ui-webview",
+    "pause"
+)
+
 Write-Launcher -Path (Join-Path $PortableDir "run-egui.bat") -Lines @(
     """%CD%\$BinaryName"" ui %*",
     "pause"
