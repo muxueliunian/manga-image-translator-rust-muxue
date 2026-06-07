@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manga Image Translator</title>
+  <style>
+<!-- MIT_WEBVIEW_STYLES -->
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow" data-i18n="eyebrow">WebView 工作台</p>
+        <h1 data-i18n="title">漫画图片翻译</h1>
+      </div>
+      <div class="top-actions">
+        <span id="backendBadge" class="badge">wry/webview2</span>
+        <button id="langToggle" class="ghost-button" type="button">English</button>
+      </div>
+    </header>
+
+    <section class="workflow" aria-label="Translation workflow">
+      <ol class="steps">
+        <li class="step is-active">
+          <span>1</span>
+          <div>
+            <strong data-i18n="stepInput">选择素材</strong>
+            <p data-i18n="stepInputHint">图片或文件夹</p>
+          </div>
+        </li>
+        <li class="step">
+          <span>2</span>
+          <div>
+            <strong data-i18n="stepModel">配置模型</strong>
+            <p data-i18n="stepModelHint">OCR 与翻译器</p>
+          </div>
+        </li>
+        <li class="step">
+          <span>3</span>
+          <div>
+            <strong data-i18n="stepRun">翻译导出</strong>
+            <p data-i18n="stepRunHint">查看结果与日志</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <div class="layout">
+      <section class="panel primary-panel" aria-labelledby="inputTitle">
+        <div class="panel-heading">
+          <div>
+            <p class="section-kicker" data-i18n="inputKicker">输入</p>
+            <h2 id="inputTitle" data-i18n="inputTitle">选择图片或文件夹</h2>
+          </div>
+          <div class="button-row">
+            <button id="pickImages" class="secondary-button" type="button" data-i18n="pickImages">选择图片</button>
+            <button id="pickFolder" class="secondary-button" type="button" data-i18n="pickFolder">选择文件夹</button>
+          </div>
+        </div>
+
+        <div class="drop-surface">
+          <div class="upload-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M12 3v12m0-12 4.5 4.5M12 3 7.5 7.5M5 15v3.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V15" />
+            </svg>
+          </div>
+          <p class="drop-title" data-i18n="dropTitle">从这里开始：选择漫画页、单张图或整本文件夹</p>
+          <p class="muted" data-i18n="dropHint">支持多选图片或选择整本文件夹，翻译完成后会按所选格式写入输出目录。</p>
+        </div>
+
+        <div class="path-list" id="inputList" aria-live="polite"></div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span data-i18n="outputDir">输出目录</span>
+            <div class="path-picker">
+              <input id="outputDir" type="text" readonly placeholder="未选择">
+              <button id="pickOutputDir" type="button" class="icon-button" aria-label="Choose output directory" title="Choose output directory">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v7A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-9Z" /></svg>
+              </button>
+            </div>
+          </label>
+
+          <label class="field">
+            <span data-i18n="outputFormat">输出格式</span>
+            <select id="outputFormat">
+              <option value="png" selected>PNG</option>
+              <option value="html">HTML</option>
+              <option value="raw">Raw MIT</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span data-i18n="textDirection">文字方向</span>
+            <select id="textDirection">
+              <option value="auto" selected data-i18n="textDirectionAuto">自动</option>
+              <option value="horizontal" data-i18n="textDirectionHorizontal">横排</option>
+              <option value="vertical" data-i18n="textDirectionVertical">竖排</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <aside class="panel config-panel" aria-labelledby="configTitle">
+        <div class="panel-heading compact config-heading">
+          <div>
+            <p class="section-kicker" data-i18n="configKicker">模型</p>
+            <h2 id="configTitle" data-i18n="configTitle">翻译配置</h2>
+          </div>
+          <div class="config-actions">
+            <button id="reloadDefaults" class="ghost-button" type="button" data-i18n="reloadDefaults">默认值</button>
+            <button id="loadConfig" class="ghost-button" type="button" data-i18n="loadConfig">加载配置</button>
+            <button id="saveConfig" class="ghost-button" type="button" data-i18n="saveConfig">保存配置</button>
+          </div>
+        </div>
+
+        <div class="form-grid single">
+          <label class="field">
+            <span data-i18n="translator">翻译器</span>
+            <select id="translator">
+              <option value="Sugoi">Sugoi</option>
+              <option value="OpenAICompatible">OpenAI Compatible</option>
+              <option value="Google">Google</option>
+              <option value="Deepl">DeepL</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span data-i18n="targetLang">目标语言</span>
+            <select id="targetLang">
+              <option value="chs">简体中文</option>
+              <option value="en">English</option>
+              <option value="ja">日本語</option>
+              <option value="ko">한국어</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span data-i18n="provider">模型供应商</span>
+            <select id="provider">
+              <option value="Custom">Custom</option>
+              <option value="OpenAI">OpenAI</option>
+              <option value="DeepSeek">DeepSeek</option>
+              <option value="OpenRouter">OpenRouter</option>
+              <option value="SiliconFlow">SiliconFlow</option>
+              <option value="DashScope">DashScope</option>
+              <option value="Moonshot">Moonshot/Kimi</option>
+              <option value="Zhipu">Zhipu GLM</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span data-i18n="baseUrl">Base URL</span>
+            <input id="baseUrl" type="url" placeholder="https://api.deepseek.com/v1">
+          </label>
+
+          <label class="field">
+            <span data-i18n="apiKey">API Key</span>
+            <input id="apiKey" type="password" autocomplete="off" placeholder="sk-...">
+          </label>
+
+          <label class="field">
+            <span data-i18n="modelName">模型名称</span>
+            <input id="modelName" type="text" placeholder="deepseek-chat / gpt-4.1-mini">
+          </label>
+
+          <div class="form-grid compact">
+            <label class="field">
+              <span data-i18n="temperature">Temperature</span>
+              <input id="temperature" type="number" min="0" max="2" step="0.05">
+            </label>
+            <label class="field">
+              <span data-i18n="topP">Top P</span>
+              <input id="topP" type="number" min="0" max="1" step="0.05">
+            </label>
+          </div>
+
+          <label class="field">
+            <span data-i18n="systemPrompt">System Prompt</span>
+            <textarea id="systemPrompt" class="prompt-area" spellcheck="false"></textarea>
+          </label>
+
+          <label class="field">
+            <span data-i18n="userPrompt">User Prompt Template</span>
+            <textarea id="userPrompt" class="prompt-area" spellcheck="false"></textarea>
+          </label>
+        </div>
+
+        <details class="json-details">
+          <summary data-i18n="advancedJson">高级 JSON 配置</summary>
+          <textarea id="settingsJson" spellcheck="false"></textarea>
+        </details>
+      </aside>
+    </div>
+
+    <section class="runbar" aria-label="Run translation">
+      <div>
+        <strong id="statusTitle" data-i18n="readyTitle">准备就绪</strong>
+        <p id="statusText" data-i18n="readyText">选择输入与输出目录后即可开始。</p>
+        <div class="progress-wrap" aria-live="polite">
+          <div class="progress-track">
+            <div id="progressBar" class="progress-bar"></div>
+          </div>
+          <span id="progressLabel" data-i18n="progressIdle">等待任务</span>
+        </div>
+      </div>
+      <button id="startTranslation" class="primary-button" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z" /></svg>
+        <span data-i18n="start">开始翻译</span>
+      </button>
+    </section>
+
+    <section class="results-layout">
+      <div class="panel">
+        <div class="panel-heading compact">
+          <div>
+            <p class="section-kicker" data-i18n="resultKicker">结果</p>
+            <h2 data-i18n="resultTitle">任务输出</h2>
+          </div>
+        </div>
+        <div id="results" class="empty-state" data-i18n="resultEmpty">暂无结果。完成翻译后会显示输出图片路径。</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-heading compact">
+          <div>
+            <p class="section-kicker" data-i18n="logKicker">日志</p>
+            <h2 data-i18n="logTitle">运行记录</h2>
+          </div>
+          <button id="clearLog" class="ghost-button" type="button" data-i18n="clearLog">清空</button>
+        </div>
+        <div id="logList" class="log-list" aria-live="polite"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+/* MIT_WEBVIEW_APP */
+  </script>
+</body>
+</html>

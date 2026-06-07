@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use egui::{Button, Ui};
 
-pub fn file_path_list(ui: &mut Ui, files: &mut Vec<PathBuf>) {
+pub fn file_path_list(ui: &mut Ui, files: &mut Vec<PathBuf>, allow_remove: bool) {
     let mut to_remove = vec![];
 
     egui::ScrollArea::both().show(ui, |ui| {
@@ -10,7 +10,7 @@ pub fn file_path_list(ui: &mut Ui, files: &mut Vec<PathBuf>) {
             ui.horizontal(|ui| {
                 ui.label(file.display().to_string());
 
-                if ui.add(Button::new("❌").small()).clicked() {
+                if allow_remove && ui.add(Button::new("Remove").small()).clicked() {
                     to_remove.push(i);
                 }
             });

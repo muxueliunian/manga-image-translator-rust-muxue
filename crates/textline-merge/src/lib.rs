@@ -366,7 +366,17 @@ impl TextBlock {
     }
 
     pub fn obb(&self) -> Option<OBB> {
-        let coords = MultiPoint::new(vec![Point::new(0.0, 0.0)])
+        let points = self
+            .lines
+            .iter()
+            .flat_map(|line| line.iter())
+            .map(|point| Point::new(point.x as f64, point.y as f64))
+            .collect::<Vec<_>>();
+        if points.is_empty() {
+            return None;
+        }
+
+        let coords = MultiPoint::new(points)
             .convex_hull()
             .minimum_rotated_rect()?;
 
@@ -946,11 +956,11 @@ fn remove_leading_spaces_after_predict(stripped_text: &str) -> String {
 mod tests {
     use std::sync::Arc;
 
-    use interface_detector::textlines::Quadrilateral;
+    use interface_detector::textlines::{self, Quadrilateral};
     use interface_ocr::QuadrilateralInfo;
     use interface_translator::LangIdDetector;
 
-    use crate::dispatch;
+    use crate::{dispatch, TextBlock};
 
     #[test]
     fn testssss() {
@@ -983,5 +993,32 @@ mod tests {
         let d = LangIdDetector::new().unwrap();
         let out = dispatch(v.iter().collect::<Vec<_>>(), 1080, 6587, &d).unwrap();
         assert_eq!(out.len(), 9)
+    }
+
+    #[test]
+    fn obb_uses_textblock_points() {
+        let block = TextBlock {
+            lines: vec![[
+                textlines::MyPoint { x: 10, y: 20 },
+                textlines::MyPoint { x: 50, y: 20 },
+                textlines::MyPoint { x: 50, y: 40 },
+                textlines::MyPoint { x: 10, y: 40 },
+            ]],
+            text: "source".to_owned(),
+            font_size: 20,
+            angle: 0.0,
+            prob: 1.0,
+            fg_color: None,
+            bg_color: None,
+            skip_translate: false,
+            language: None,
+            translations: Default::default(),
+        };
+
+        let obb = block.obb().unwrap();
+        assert!((obb.x - 30.0).abs() < 0.01);
+        assert!((obb.y - 30.0).abs() < 0.01);
+        assert!((obb.w.max(obb.h) - 40.0).abs() < 0.01);
+        assert!((obb.w.min(obb.h) - 20.0).abs() < 0.01);
     }
 }
