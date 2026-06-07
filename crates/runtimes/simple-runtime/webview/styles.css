@@ -291,9 +291,22 @@ svg {
   font-size: 13px;
 }
 
+.path-text {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
 .path-item strong {
   color: var(--text);
   font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.path-item span,
+.result-path {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -358,7 +371,8 @@ textarea.prompt-area {
 .primary-button,
 .secondary-button,
 .ghost-button,
-.icon-button {
+.icon-button,
+.tiny-button {
   min-height: 44px;
   border-radius: 8px;
   border: 1px solid transparent;
@@ -408,6 +422,27 @@ textarea.prompt-area {
 
 .icon-button {
   padding: 0;
+}
+
+.small-button {
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.tiny-button {
+  min-height: 32px;
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-color: var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tiny-button:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-soft);
 }
 
 .json-details {
@@ -476,6 +511,69 @@ textarea.prompt-area {
   border-radius: 8px;
   padding: 12px;
   background: var(--surface-soft);
+}
+
+.result-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.result-summary {
+  margin-bottom: 12px;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.result-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  font-weight: 650;
+}
+
+.result-check input {
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+.result-check span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  margin: 10px 0;
+}
+
+.result-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.result-path {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .result-item strong {

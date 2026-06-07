@@ -57,6 +57,7 @@
           <div class="button-row">
             <button id="pickImages" class="secondary-button" type="button" data-i18n="pickImages">选择图片</button>
             <button id="pickFolder" class="secondary-button" type="button" data-i18n="pickFolder">选择文件夹</button>
+            <button id="clearInputs" class="ghost-button" type="button" data-i18n="clearInputs">清空</button>
           </div>
         </div>
 
@@ -74,7 +75,7 @@
 
         <div class="form-grid">
           <label class="field">
-            <span data-i18n="outputDir">输出目录</span>
+            <span data-i18n="outputDir">导出目录</span>
             <div class="path-picker">
               <input id="outputDir" type="text" readonly placeholder="未选择">
               <button id="pickOutputDir" type="button" class="icon-button" aria-label="Choose output directory" title="Choose output directory">
@@ -218,6 +219,10 @@
           <div>
             <p class="section-kicker" data-i18n="resultKicker">结果</p>
             <h2 data-i18n="resultTitle">任务输出</h2>
+          </div>
+          <div class="result-actions">
+            <button id="selectAllResults" class="ghost-button" type="button" data-i18n="selectAllResults">全选</button>
+            <button id="exportSelected" class="secondary-button" type="button" data-i18n="exportSelected">导出选中</button>
           </div>
         </div>
         <div id="results" class="empty-state" data-i18n="resultEmpty">暂无结果。完成翻译后会显示输出图片路径。</div>

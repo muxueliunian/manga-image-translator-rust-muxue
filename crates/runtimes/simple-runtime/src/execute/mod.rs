@@ -21,6 +21,8 @@ use crate::{
 
 pub type ImageProcessor = Arc<dyn ImageOp + Sync + Send>;
 
+pub type StageCallback<'a> = Option<&'a mut dyn FnMut(&'static str)>;
+
 impl Models {
     pub async fn execute(
         &mut self,
@@ -28,8 +30,21 @@ impl Models {
         config: &Settings,
         debug_path: Option<PathBuf>,
     ) -> anyhow::Result<Option<Export>> {
+        self.execute_with_progress(img, config, debug_path, None)
+            .await
+    }
+
+    pub async fn execute_with_progress(
+        &mut self,
+        img: DynamicImage,
+        config: &Settings,
+        debug_path: Option<PathBuf>,
+        mut on_stage: StageCallback<'_>,
+    ) -> anyhow::Result<Option<Export>> {
+        emit_stage(&mut on_stage, "图片预处理");
         let ip = Arc::new(CpuImageProcessor::default()) as ImageProcessor;
         let (img, alpha) = RawImage::rgba(img);
+        emit_stage(&mut on_stage, "图像放大");
         let (img, alpha) = self.run_upscaler(img, alpha, config.upscaler, &ip).await?;
 
         if let Some(debug_path) = &debug_path {
@@ -37,6 +52,7 @@ impl Models {
             save_img(&img, &debug_path.join("0_input.png"))?;
         }
 
+        emit_stage(&mut on_stage, "文字检测");
         let (areas, mask) = self.run_detector(&img, &config.detector, &ip).await?;
         if let Some(debug_path) = &debug_path {
             save_mask(&mask, &debug_path.join("1_mask_raw.png"))?;
@@ -50,6 +66,7 @@ impl Models {
         let areas = areas.into_iter().map(to_mutex).collect::<Vec<_>>();
         let upscaled_img = img;
 
+        emit_stage(&mut on_stage, "OCR 识别");
         let textlines = self
             .run_ocr(&upscaled_img, &areas, &config.ocr, &debug_path, &ip)
             .await?;
@@ -62,6 +79,7 @@ impl Models {
             save_json(&textlines, &debug_path.join("2_quadrilateral.json"))?;
         }
 
+        emit_stage(&mut on_stage, "文本行合并");
         let textblocks = self.run_textline_merge(
             &textlines,
             upscaled_img.width,
@@ -78,6 +96,7 @@ impl Models {
             render_textblocks(&upscaled_img, &textblocks, debug_path)?;
         }
 
+        emit_stage(&mut on_stage, "翻译文本");
         let textblocks = self.run_pre_dict(textblocks, &config.translator)?;
         if let Some(debug_path) = &debug_path {
             if config.translator.pre_dict.is_some() {
@@ -99,6 +118,7 @@ impl Models {
 
         let textblocks = self.run_post_dict(textblocks, &config.translator)?;
 
+        emit_stage(&mut on_stage, "修补文字区域");
         let mask_refined = Models::run_mask_refinement(
             &upscaled_img,
             &mask,
@@ -113,6 +133,7 @@ impl Models {
 
         let upscaled_img = Arc::new(upscaled_img);
 
+        emit_stage(&mut on_stage, "图像修补");
         let (inpainted, mask) = self
             .run_inpainter(&upscaled_img, mask, mask_refined, &config.inpainter, &ip)
             .await?;
@@ -138,6 +159,12 @@ impl Models {
             textblocks,
             None,
         )))
+    }
+}
+
+fn emit_stage(on_stage: &mut StageCallback<'_>, stage: &'static str) {
+    if let Some(callback) = on_stage.as_deref_mut() {
+        callback(stage);
     }
 }
 

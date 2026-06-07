@@ -12,9 +12,10 @@ const i18n = {
     inputTitle: "选择图片或文件夹",
     pickImages: "选择图片",
     pickFolder: "选择文件夹",
+    clearInputs: "清空",
     dropTitle: "从这里开始：选择漫画页、单张图或整本文件夹",
-    dropHint: "支持多选图片或选择整本文件夹，翻译完成后会按所选格式写入输出目录。",
-    outputDir: "输出目录",
+    dropHint: "支持多选图片或选择整本文件夹，翻译完成后会先生成可预览结果，再按需导出。",
+    outputDir: "导出目录",
     outputFormat: "输出格式",
     textDirection: "文字方向",
     textDirectionAuto: "自动",
@@ -40,15 +41,23 @@ const i18n = {
     readyText: "选择输入与输出目录后即可开始。",
     start: "开始翻译",
     resultKicker: "结果",
-    resultTitle: "任务输出",
-    resultEmpty: "暂无结果。完成翻译后会显示输出图片路径。",
+    resultTitle: "预览与导出",
+    resultEmpty: "暂无结果。完成翻译后可预览图片，并选择导出到指定目录。",
+    selectAllResults: "全选",
+    deselectAllResults: "取消全选",
+    exportSelected: "导出选中",
+    preview: "预览",
+    exported: "已导出",
+    exportNeedSelection: "请先勾选要导出的结果。",
+    exportNeedDir: "请先选择导出目录。",
+    remove: "删除",
     logKicker: "日志",
     logTitle: "运行记录",
     clearLog: "清空",
     noInput: "未选择输入",
     selected: "已选择",
     folderSelected: "已选择文件夹",
-    outputSelected: "输出目录已设置",
+    outputSelected: "导出目录已设置",
     defaultsLoaded: "默认配置已加载",
     configLoaded: "配置已加载",
     configSaved: "配置已保存",
@@ -73,9 +82,10 @@ const i18n = {
     inputTitle: "Choose Images or Folder",
     pickImages: "Choose Images",
     pickFolder: "Choose Folder",
+    clearInputs: "Clear",
     dropTitle: "Start here: choose manga pages, one image, or a whole folder",
-    dropHint: "Select multiple images or an entire folder. Finished pages are written to the output directory.",
-    outputDir: "Output Directory",
+    dropHint: "Select images or a folder. Finished pages are cached for preview, then exported on demand.",
+    outputDir: "Export Directory",
     outputFormat: "Output Format",
     textDirection: "Text Direction",
     textDirectionAuto: "Auto",
@@ -101,8 +111,16 @@ const i18n = {
     readyText: "Choose input and output directory to begin.",
     start: "Start Translating",
     resultKicker: "Results",
-    resultTitle: "Task Output",
-    resultEmpty: "No results yet. Output image paths will appear after translation.",
+    resultTitle: "Preview and Export",
+    resultEmpty: "No results yet. Finished images can be previewed and exported after translation.",
+    selectAllResults: "Select All",
+    deselectAllResults: "Deselect All",
+    exportSelected: "Export Selected",
+    preview: "Preview",
+    exported: "Exported",
+    exportNeedSelection: "Select at least one result first.",
+    exportNeedDir: "Choose an export directory first.",
+    remove: "Remove",
     logKicker: "Logs",
     logTitle: "Run Log",
     clearLog: "Clear",
@@ -137,6 +155,8 @@ const state = {
   lang: localStorage.getItem("mitWebviewLang") || "zh",
   inputPaths: [],
   outputDir: "",
+  results: [],
+  selectedResults: new Set(),
   settings: null,
   requestId: 0,
   pending: new Map(),
@@ -147,6 +167,7 @@ const els = {
   backendBadge: document.getElementById("backendBadge"),
   pickImages: document.getElementById("pickImages"),
   pickFolder: document.getElementById("pickFolder"),
+  clearInputs: document.getElementById("clearInputs"),
   pickOutputDir: document.getElementById("pickOutputDir"),
   outputDir: document.getElementById("outputDir"),
   outputFormat: document.getElementById("outputFormat"),
@@ -171,6 +192,8 @@ const els = {
   statusText: document.getElementById("statusText"),
   progressBar: document.getElementById("progressBar"),
   progressLabel: document.getElementById("progressLabel"),
+  selectAllResults: document.getElementById("selectAllResults"),
+  exportSelected: document.getElementById("exportSelected"),
   results: document.getElementById("results"),
   logList: document.getElementById("logList"),
   clearLog: document.getElementById("clearLog"),
@@ -207,6 +230,7 @@ function applyLang() {
   });
   els.langToggle.textContent = state.lang === "zh" ? "English" : "中文";
   if (!state.inputPaths.length) renderInputList();
+  renderResults();
 }
 
 function invoke(kind, payload = {}) {
@@ -268,13 +292,31 @@ function renderInputList() {
     return;
   }
 
-  state.inputPaths.forEach((path) => {
+  state.inputPaths.forEach((path, index) => {
     const item = document.createElement("div");
     item.className = "path-item";
     const name = path.split(/[\\/]/).filter(Boolean).pop() || path;
-    item.innerHTML = `<strong title="${escapeHtml(path)}">${escapeHtml(name)}</strong><span>${escapeHtml(path)}</span>`;
+    item.innerHTML = `
+      <div class="path-text">
+        <strong title="${escapeHtml(path)}">${escapeHtml(name)}</strong>
+        <span>${escapeHtml(path)}</span>
+      </div>
+      <button class="tiny-button" type="button" data-remove-input="${index}">${t("remove")}</button>
+    `;
     els.inputList.append(item);
   });
+}
+
+function removeInput(index) {
+  state.inputPaths.splice(index, 1);
+  renderInputList();
+  setStatus(t("selected"), `${state.inputPaths.length} ${t("selected")}`);
+}
+
+function clearInputs() {
+  state.inputPaths = [];
+  renderInputList();
+  setStatus(t("readyTitle"), t("readyText"));
 }
 
 function escapeHtml(value) {
@@ -453,11 +495,11 @@ async function startTranslation() {
     setStatus(t("starting"), t("backendPending"));
     const result = await invoke("startTranslation", {
       input_paths: state.inputPaths,
-      output_dir: state.outputDir || null,
       settings,
       output_format: els.outputFormat.value,
     });
     renderResult(result);
+    clearInputs();
     addLog("success", result.message || t("backendPending"));
   } catch (err) {
     setStatus(t("backendPending"), err.message);
@@ -468,26 +510,122 @@ async function startTranslation() {
 }
 
 function renderResult(result) {
-  els.results.className = "";
   const outputs = Array.isArray(result.outputs) ? result.outputs : [];
-  const rows = outputs.map((item) => {
-    const output = item.output || "-";
-    return `
-      <div class="result-item" data-status="${escapeHtml(item.status || "")}">
-        <strong>${escapeHtml(item.status || "")}</strong>
-        <p>${escapeHtml(item.input || "")}</p>
-        <p class="muted">${escapeHtml(output)}</p>
-        <p class="muted">${escapeHtml(item.message || "")}</p>
+  state.results = outputs;
+  state.selectedResults = new Set(
+    outputs
+      .filter((item) => item.status === "done" && item.output)
+      .map((item) => item.output),
+  );
+  renderResults(result);
+}
+
+function renderResults(result = null) {
+  if (!state.results.length) {
+    els.results.className = "empty-state";
+    els.results.textContent = t("resultEmpty");
+    els.selectAllResults.textContent = t("selectAllResults");
+    return;
+  }
+
+  els.results.className = "result-list";
+  const summary = result
+    ? `<div class="result-summary"><strong>${escapeHtml(result.status || "done")}</strong><p class="muted">${escapeHtml(result.message || "")}</p></div>`
+    : "";
+  const rows = state.results
+    .map((item, index) => resultCard(item, index))
+    .join("");
+  els.results.innerHTML = `${summary}<div class="result-grid">${rows}</div>`;
+  const doneOutputs = state.results.filter((item) => item.status === "done" && item.output);
+  const allSelected =
+    doneOutputs.length > 0 && doneOutputs.every((item) => state.selectedResults.has(item.output));
+  els.selectAllResults.textContent = allSelected ? t("deselectAllResults") : t("selectAllResults");
+}
+
+function resultCard(item, index) {
+  const output = item.output || "";
+  const checked = output && state.selectedResults.has(output) ? "checked" : "";
+  const canUse = item.status === "done" && output;
+  const thumb = canUse && output.toLowerCase().endsWith(".png")
+    ? `<div class="result-thumb"><img alt="" src="${escapeHtml(fileUrl(output))}"></div>`
+    : `<div class="result-thumb muted">${escapeHtml(item.status || "-")}</div>`;
+  return `
+    <article class="result-item" data-status="${escapeHtml(item.status || "")}">
+      <label class="result-check">
+        <input type="checkbox" data-result-index="${index}" ${checked} ${canUse ? "" : "disabled"}>
+        <span>${escapeHtml(item.file_name || item.status || "-")}</span>
+      </label>
+      ${thumb}
+      <p class="result-path" title="${escapeHtml(output || item.input || "")}">${escapeHtml(output || item.input || "-")}</p>
+      <p class="muted">${escapeHtml(item.message || "")}</p>
+      <div class="button-row">
+        <button class="ghost-button small-button" type="button" data-preview-index="${index}" ${canUse ? "" : "disabled"}>${t("preview")}</button>
       </div>
-    `;
-  }).join("");
-  els.results.innerHTML = `
-    <div class="result-summary">
-      <strong>${escapeHtml(result.status || "done")}</strong>
-      <p class="muted">${escapeHtml(result.message || "")}</p>
-    </div>
-    <div class="result-list">${rows}</div>
+    </article>
   `;
+}
+
+function fileUrl(path) {
+  return `file:///${String(path).replaceAll("\\", "/").split("/").map(encodeURIComponent).join("/")}`;
+}
+
+async function previewResult(index) {
+  const item = state.results[index];
+  if (!item?.output) return;
+  try {
+    await invoke("previewResult", { path: item.output });
+  } catch (err) {
+    addLog("error", err.message);
+  }
+}
+
+function toggleResult(index, checked) {
+  const item = state.results[index];
+  if (!item?.output) return;
+  if (checked) {
+    state.selectedResults.add(item.output);
+  } else {
+    state.selectedResults.delete(item.output);
+  }
+  renderResults();
+}
+
+function toggleAllResults() {
+  const doneOutputs = state.results.filter((item) => item.status === "done" && item.output);
+  const allSelected =
+    doneOutputs.length > 0 && doneOutputs.every((item) => state.selectedResults.has(item.output));
+  if (allSelected) {
+    doneOutputs.forEach((item) => state.selectedResults.delete(item.output));
+  } else {
+    doneOutputs.forEach((item) => state.selectedResults.add(item.output));
+  }
+  renderResults();
+}
+
+async function exportSelectedResults() {
+  const outputs = [...state.selectedResults];
+  if (!outputs.length) {
+    setStatus(t("exportNeedSelection"), "");
+    addLog("error", t("exportNeedSelection"));
+    return;
+  }
+  if (!state.outputDir) {
+    setStatus(t("exportNeedDir"), "");
+    addLog("error", t("exportNeedDir"));
+    return;
+  }
+  try {
+    const data = await invoke("exportResults", {
+      outputs,
+      export_dir: state.outputDir,
+    });
+    const count = Array.isArray(data.exported) ? data.exported.length : 0;
+    setStatus(t("exported"), `${count} ${t("selected")}`);
+    addLog("success", `${t("exported")}: ${count}`);
+  } catch (err) {
+    setStatus(t("backendPending"), err.message);
+    addLog("error", err.message);
+  }
 }
 
 async function bootstrap() {
@@ -501,6 +639,7 @@ async function bootstrap() {
   });
   els.pickImages.addEventListener("click", chooseImages);
   els.pickFolder.addEventListener("click", chooseFolder);
+  els.clearInputs.addEventListener("click", clearInputs);
   els.pickOutputDir.addEventListener("click", chooseOutputDir);
   els.reloadDefaults.addEventListener("click", loadDefaults);
   els.loadConfig.addEventListener("click", loadConfig);
@@ -538,6 +677,26 @@ async function bootstrap() {
     });
   });
   els.startTranslation.addEventListener("click", startTranslation);
+  els.selectAllResults.addEventListener("click", toggleAllResults);
+  els.exportSelected.addEventListener("click", exportSelectedResults);
+  els.inputList.addEventListener("click", (event) => {
+    const removeIndex = event.target?.dataset?.removeInput;
+    if (removeIndex !== undefined) {
+      removeInput(Number(removeIndex));
+    }
+  });
+  els.results.addEventListener("click", (event) => {
+    const previewIndex = event.target?.dataset?.previewIndex;
+    if (previewIndex !== undefined) {
+      previewResult(Number(previewIndex));
+    }
+  });
+  els.results.addEventListener("change", (event) => {
+    const resultIndex = event.target?.dataset?.resultIndex;
+    if (resultIndex !== undefined) {
+      toggleResult(Number(resultIndex), event.target.checked);
+    }
+  });
   els.clearLog.addEventListener("click", () => {
     els.logList.innerHTML = "";
   });

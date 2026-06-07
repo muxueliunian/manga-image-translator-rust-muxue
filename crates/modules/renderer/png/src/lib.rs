@@ -71,6 +71,7 @@ impl PngRenderer {
         normalize_color_image(&mut img);
         let overlay = exp.get_overlay();
         apply_inpaint_overlay(&mut img, &overlay);
+        let mut placed_boxes = Vec::new();
 
         for block in exp.blocks {
             let Some(obb) = block.obb() else {
@@ -87,7 +88,9 @@ impl PngRenderer {
                 continue;
             }
 
-            let detected_vertical = obb.h > obb.w * 1.25;
+            let source_text = block.text.clone();
+            let detected_vertical =
+                auto_detect_vertical(&source_text, block.lines.len(), obb.w, obb.h);
             let vertical = match config.text_direction {
                 TextDirectionMode::Auto => detected_vertical,
                 TextDirectionMode::Horizontal => false,
@@ -141,9 +144,175 @@ impl PngRenderer {
 
             let text_img = self.render_block(render_block);
             let theta = if vertical { obb.theta } else { 0.0 };
-            alpha_composite_rotated(&mut img, &text_img, obb.x, obb.y, theta);
+            let (x, y, placed) = find_non_overlapping_position(
+                &placed_boxes,
+                img.width as f64,
+                img.height as f64,
+                &text_img,
+                obb.x,
+                obb.y,
+                theta,
+            );
+            alpha_composite_rotated(&mut img, &text_img, x, y, theta);
+            placed_boxes.push(placed);
         }
         img
+    }
+}
+
+fn auto_detect_vertical(source_text: &str, line_count: usize, w: f64, h: f64) -> bool {
+    if looks_like_horizontal_sentence(source_text) {
+        return false;
+    }
+    if line_count > 1 && source_text.chars().count() >= line_count.saturating_mul(3) {
+        return false;
+    }
+    h > w * 1.35
+}
+
+fn looks_like_horizontal_sentence(text: &str) -> bool {
+    let chars = text
+        .chars()
+        .filter(|ch| !ch.is_whitespace())
+        .collect::<Vec<_>>();
+    if chars.len() >= 8 {
+        return true;
+    }
+    let horizontal_marks = [
+        '。', '、', '，', '？', '！', ',', '.', '?', '!', '…', 'ー', '〜', '~',
+    ];
+    let mark_count = chars
+        .iter()
+        .filter(|ch| horizontal_marks.contains(ch))
+        .count();
+    mark_count > 0 && chars.len() >= 4
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Aabb {
+    x1: f64,
+    y1: f64,
+    x2: f64,
+    y2: f64,
+}
+
+impl Aabb {
+    fn intersects(self, other: Self) -> bool {
+        self.x1 < other.x2 && self.x2 > other.x1 && self.y1 < other.y2 && self.y2 > other.y1
+    }
+
+    fn in_bounds(self, width: f64, height: f64) -> bool {
+        self.x1 >= 0.0 && self.y1 >= 0.0 && self.x2 <= width && self.y2 <= height
+    }
+
+    fn area(self) -> f64 {
+        (self.x2 - self.x1).max(0.0) * (self.y2 - self.y1).max(0.0)
+    }
+}
+
+fn find_non_overlapping_position(
+    placed_boxes: &[Aabb],
+    img_width: f64,
+    img_height: f64,
+    overlay: &RawImage,
+    center_x: f64,
+    center_y: f64,
+    theta: f64,
+) -> (f64, f64, Aabb) {
+    let base = rotated_aabb(overlay, center_x, center_y, theta);
+    if !collides(base, placed_boxes) && base.in_bounds(img_width, img_height) {
+        return (center_x, center_y, base);
+    }
+
+    let step = overlay.width.max(overlay.height) as f64 * 0.35 + 10.0;
+    let directions = [
+        (0.0, -1.0),
+        (0.0, 1.0),
+        (1.0, 0.0),
+        (-1.0, 0.0),
+        (1.0, -1.0),
+        (-1.0, -1.0),
+        (1.0, 1.0),
+        (-1.0, 1.0),
+    ];
+    let mut best = (
+        center_x,
+        center_y,
+        base,
+        collision_score(base, placed_boxes),
+    );
+
+    for ring in 1..=6 {
+        for (dx, dy) in directions {
+            let x = center_x + dx * step * ring as f64;
+            let y = center_y + dy * step * ring as f64;
+            let candidate = rotated_aabb(overlay, x, y, theta);
+            if !candidate.in_bounds(img_width, img_height) {
+                continue;
+            }
+            let score = collision_score(candidate, placed_boxes);
+            if score <= f64::EPSILON {
+                return (x, y, candidate);
+            }
+            if score < best.3 {
+                best = (x, y, candidate, score);
+            }
+        }
+    }
+
+    (best.0, best.1, best.2)
+}
+
+fn collides(candidate: Aabb, placed_boxes: &[Aabb]) -> bool {
+    placed_boxes
+        .iter()
+        .any(|placed| candidate.intersects(*placed))
+}
+
+fn collision_score(candidate: Aabb, placed_boxes: &[Aabb]) -> f64 {
+    placed_boxes
+        .iter()
+        .map(|placed| intersection(candidate, *placed).area())
+        .sum()
+}
+
+fn intersection(a: Aabb, b: Aabb) -> Aabb {
+    Aabb {
+        x1: a.x1.max(b.x1),
+        y1: a.y1.max(b.y1),
+        x2: a.x2.min(b.x2),
+        y2: a.y2.min(b.y2),
+    }
+}
+
+fn rotated_aabb(overlay: &RawImage, center_x: f64, center_y: f64, theta: f64) -> Aabb {
+    let half_w = overlay.width as f64 / 2.0;
+    let half_h = overlay.height as f64 / 2.0;
+    let cos_t = theta.cos();
+    let sin_t = theta.sin();
+    let corners = [
+        (-half_w, -half_h),
+        (half_w, -half_h),
+        (half_w, half_h),
+        (-half_w, half_h),
+    ];
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    for (dx, dy) in corners {
+        let x = center_x + dx * cos_t - dy * sin_t;
+        let y = center_y + dx * sin_t + dy * cos_t;
+        min_x = min_x.min(x);
+        min_y = min_y.min(y);
+        max_x = max_x.max(x);
+        max_y = max_y.max(y);
+    }
+    Aabb {
+        x1: min_x,
+        y1: min_y,
+        x2: max_x,
+        y2: max_y,
     }
 }
 
@@ -405,7 +574,11 @@ impl PngRenderer {
         buffer_
     }
 
-    fn create_vertical_buffer(&mut self, text: &RenderTextBlock, color_map: &mut ColorMap) -> Buffer {
+    fn create_vertical_buffer(
+        &mut self,
+        text: &RenderTextBlock,
+        color_map: &mut ColorMap,
+    ) -> Buffer {
         let mut vertical_text = text.clone();
         vertical_text.texts.iter_mut().for_each(|span| {
             span.text = span

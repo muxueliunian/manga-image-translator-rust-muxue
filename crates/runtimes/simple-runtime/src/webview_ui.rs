@@ -1,7 +1,8 @@
 use std::{
-    fs::{create_dir_all, read_to_string, File},
+    fs::{copy, create_dir_all, read_to_string, File},
     io::Write,
     path::{Path, PathBuf},
+    process::Command,
     sync::Arc,
     thread,
 };
@@ -55,6 +56,8 @@ enum IpcKind {
     LoadConfig,
     SaveConfig,
     StartTranslation,
+    PreviewResult,
+    ExportResults,
 }
 
 #[derive(Debug, Serialize)]
@@ -88,6 +91,7 @@ struct StartTranslationResult {
 struct TranslationOutput {
     input: String,
     output: Option<String>,
+    file_name: Option<String>,
     status: String,
     message: String,
 }
@@ -103,7 +107,6 @@ struct ProgressEvent {
 #[derive(Deserialize)]
 struct StartTranslationPayload {
     input_paths: Vec<PathBuf>,
-    output_dir: Option<PathBuf>,
     settings: Settings,
     output_format: String,
 }
@@ -111,6 +114,22 @@ struct StartTranslationPayload {
 #[derive(Deserialize)]
 struct SaveConfigPayload {
     settings: Settings,
+}
+
+#[derive(Deserialize)]
+struct PreviewResultPayload {
+    path: PathBuf,
+}
+
+#[derive(Deserialize)]
+struct ExportResultsPayload {
+    outputs: Vec<PathBuf>,
+    export_dir: PathBuf,
+}
+
+#[derive(Serialize)]
+struct ExportResultsData {
+    exported: Vec<String>,
 }
 
 pub fn run() -> Result<()> {
@@ -255,6 +274,19 @@ fn handle_ipc_request(request: &IpcRequest) -> Result<serde_json::Value> {
                 "path": config_path().display().to_string(),
             }))
         }
+        IpcKind::PreviewResult => {
+            let payload = serde_json::from_value::<PreviewResultPayload>(request.payload.clone())
+                .map_err(|err| anyhow!("Invalid preview payload: {err}"))?;
+            open_path(&payload.path)?;
+            to_value(serde_json::json!({
+                "path": payload.path.display().to_string(),
+            }))
+        }
+        IpcKind::ExportResults => {
+            let payload = serde_json::from_value::<ExportResultsPayload>(request.payload.clone())
+                .map_err(|err| anyhow!("Invalid export payload: {err}"))?;
+            export_results(&payload.outputs, &payload.export_dir).and_then(to_value)
+        }
         IpcKind::StartTranslation => unreachable!("handled asynchronously"),
     }
 }
@@ -324,10 +356,6 @@ fn validate_translation_payload(payload: &StartTranslationPayload) -> Result<()>
         ));
     }
 
-    if payload.output_dir.is_none() {
-        return Err(anyhow!("Please choose an output directory."));
-    }
-
     match payload.output_format.as_str() {
         "html" | "raw" | "png" => {}
         value => return Err(anyhow!("Unsupported output format: {value}")),
@@ -345,10 +373,7 @@ async fn run_translation_job(
     let renderer = renderer_from_web_value(&payload.output_format)?;
     payload.settings.render.renderer = renderer;
 
-    let output_dir = payload
-        .output_dir
-        .clone()
-        .ok_or_else(|| anyhow!("Please choose an output directory."))?;
+    let output_dir = internal_results_dir();
     create_dir_all(&output_dir)?;
 
     let inputs = expand_input_paths(&payload.input_paths)?;
@@ -374,11 +399,24 @@ async fn run_translation_job(
                     .unwrap_or("image")
             ),
         );
-        let result = process_one(&input, &output_dir, &payload.settings, &models).await;
+        let result = process_one(
+            &input,
+            &output_dir,
+            &payload.settings,
+            &models,
+            &proxy,
+            index,
+            total,
+        )
+        .await;
         match result {
             Ok(Some(output)) => {
                 outputs.push(TranslationOutput {
                     input: input.display().to_string(),
+                    file_name: output
+                        .file_name()
+                        .and_then(|value| value.to_str())
+                        .map(str::to_owned),
                     output: Some(output.display().to_string()),
                     status: "done".to_owned(),
                     message: "完成".to_owned(),
@@ -389,6 +427,7 @@ async fn run_translation_job(
                 outputs.push(TranslationOutput {
                     input: input.display().to_string(),
                     output: None,
+                    file_name: None,
                     status: "skipped".to_owned(),
                     message: "未检测到可翻译文本".to_owned(),
                 });
@@ -398,6 +437,7 @@ async fn run_translation_job(
                 outputs.push(TranslationOutput {
                     input: input.display().to_string(),
                     output: None,
+                    file_name: None,
                     status: "failed".to_owned(),
                     message: err.to_string(),
                 });
@@ -438,6 +478,14 @@ fn send_progress(
     }));
 }
 
+fn internal_results_dir() -> PathBuf {
+    std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("results")
+        .join("webview")
+        .join(format!("job_{}", uuid::Uuid::new_v4()))
+}
+
 async fn ensure_models(models: &Arc<std::sync::Mutex<Option<Models>>>) -> Result<()> {
     let needs_init = models.lock().map(|guard| guard.is_none()).unwrap_or(true);
     if !needs_init {
@@ -460,6 +508,9 @@ async fn process_one(
     output_dir: &Path,
     settings: &Settings,
     models: &Arc<std::sync::Mutex<Option<Models>>>,
+    proxy: &tao::event_loop::EventLoopProxy<UserEvent>,
+    index: usize,
+    total: usize,
 ) -> Result<Option<PathBuf>> {
     let img = image::open(input)?;
     let exp = {
@@ -471,7 +522,17 @@ async fn process_one(
                 .take()
                 .ok_or_else(|| anyhow!("Models were not initialized"))?
         };
-        let result = model_state.execute(img, settings, None).await;
+        let file_name = input
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("image")
+            .to_owned();
+        let mut stage_sender = |stage: &'static str| {
+            send_progress(proxy, index, total, format!("{}：{}", file_name, stage));
+        };
+        let result = model_state
+            .execute_with_progress(img, settings, None, Some(&mut stage_sender))
+            .await;
         let mut guard = models
             .lock()
             .map_err(|_| anyhow!("Model state lock was poisoned"))?;
@@ -482,6 +543,18 @@ async fn process_one(
         return Ok(None);
     };
 
+    send_progress(
+        proxy,
+        index,
+        total,
+        format!(
+            "{}：渲染嵌字",
+            input
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("image")
+        ),
+    );
     let mut output = output_dir.join(
         input
             .file_name()
@@ -493,6 +566,76 @@ async fn process_one(
     let data = render_export_bytes_with_settings(exp, settings)?;
     File::create(&output)?.write_all(&data)?;
     Ok(Some(output))
+}
+
+fn open_path(path: &Path) -> Result<()> {
+    if !path.exists() {
+        return Err(anyhow!("Preview file does not exist: {}", path.display()));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer.exe").arg(path).spawn()?;
+        return Ok(());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open").arg(path).spawn()?;
+        return Ok(());
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        Command::new("xdg-open").arg(path).spawn()?;
+        return Ok(());
+    }
+}
+
+fn export_results(outputs: &[PathBuf], export_dir: &Path) -> Result<ExportResultsData> {
+    if outputs.is_empty() {
+        return Err(anyhow!("Please select at least one finished result."));
+    }
+    create_dir_all(export_dir)?;
+
+    let mut exported = Vec::with_capacity(outputs.len());
+    for output in outputs {
+        if !output.is_file() {
+            return Err(anyhow!("Result file does not exist: {}", output.display()));
+        }
+        let file_name = output
+            .file_name()
+            .ok_or_else(|| anyhow!("Invalid result file path: {}", output.display()))?;
+        let target = unique_target_path(export_dir, Path::new(file_name));
+        copy(output, &target)?;
+        exported.push(target.display().to_string());
+    }
+
+    Ok(ExportResultsData { exported })
+}
+
+fn unique_target_path(dir: &Path, file_name: &Path) -> PathBuf {
+    let candidate = dir.join(file_name);
+    if !candidate.exists() {
+        return candidate;
+    }
+
+    let stem = file_name
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("result");
+    let ext = file_name.extension().and_then(|value| value.to_str());
+    for index in 1.. {
+        let name = match ext {
+            Some(ext) if !ext.is_empty() => format!("{stem}_{index}.{ext}"),
+            _ => format!("{stem}_{index}"),
+        };
+        let candidate = dir.join(name);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    unreachable!()
 }
 
 fn renderer_from_web_value(value: &str) -> Result<Renderer> {
