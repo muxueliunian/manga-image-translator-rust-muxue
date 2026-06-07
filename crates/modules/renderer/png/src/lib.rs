@@ -105,7 +105,8 @@ impl PngRenderer {
                 }],
             };
 
-            let mut font_size = self.max_fontsize(size, render_block.clone(), 1.0);
+            let mut font_size =
+                self.max_fontsize(size, render_block.clone(), config.max_fontsize, 1.0);
             if block.font_size > 0 {
                 let detected = block.font_size as f32;
                 font_size = font_size.clamp(
@@ -444,6 +445,7 @@ impl PngRenderer {
         &mut self,
         target_size: (usize, usize),
         mut text: RenderTextBlock,
+        max_size: f32,
         eps: f32,
     ) -> f32 {
         let mut measure = |size: f32| {
@@ -454,12 +456,12 @@ impl PngRenderer {
             wh(&layouts)
         };
         let mut low = 0.0;
-        let mut high = 1.0;
+        let mut high = 1.0_f32.min(max_size.max(1.0));
         while {
             let (w, h) = measure(high);
-            w <= target_size.0 && h <= target_size.1
+            w <= target_size.0 && h <= target_size.1 && high < max_size
         } {
-            high *= 2.0;
+            high = (high * 2.0).min(max_size);
         }
 
         while high - low > eps {
@@ -571,7 +573,43 @@ mod tests {
             }],
         };
         let img = renderer.render_block(block);
-        img.to_image().unwrap().save("text.png").unwrap();
+
+        assert_eq!(img.width, 1000);
+        assert_eq!(img.height, 2000);
+        assert_eq!(img.channels, 4);
+        assert!(
+            img.data.chunks(4).any(|pixel| pixel[3] > 0),
+            "text rendering should produce visible pixels"
+        );
+    }
+
+    #[test]
+    fn max_fontsize_respects_cap_for_unmeasured_text() {
+        let mut renderer = PngRenderer::default();
+        let block = RenderTextBlock {
+            align: cosmic_text::Align::Center,
+            default_font_size: 1.0,
+            default_line_height: 1.2,
+            vertical: false,
+            size: (100, 100),
+            texts: vec![Text {
+                text: String::new(),
+                letter_spacing: None,
+                color: Some((0, 0, 0)),
+                bg_color: None,
+                stretch: None,
+                style: Style::Normal,
+                weight: None,
+                family: Some("Arial".to_owned()),
+                font_size: 1.0,
+                line_height: 1.2,
+            }],
+        };
+
+        let font_size = renderer.max_fontsize((100, 100), block, 8.0, 0.25);
+
+        assert!(font_size.is_finite());
+        assert!(font_size <= 8.0);
     }
 
     #[test]
